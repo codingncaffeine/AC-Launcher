@@ -76,9 +76,9 @@
                     </StackPanel>
                   </Expander.Header>
                   <StackPanel Spacing="2">
-                    <CheckBox Content="Show all servers" IsChecked="{Binding ShowAllServers}" />
-                    <TextBlock Text="No servers to show. Tick Show all servers, or add one under Servers."
-                               IsVisible="{Binding HasNoServers}" Classes="dim" />
+                    <Button Classes="link" Content="{Binding ServerListToggleLabel}" Command="{Binding ToggleServerListCommand}"
+                            HorizontalAlignment="Left" Padding="0,2" />
+                    <TextBlock Text="{Binding EmptyHint}" IsVisible="{Binding HasNoServers}" Classes="dim" TextWrapping="Wrap" />
                     <ItemsControl ItemsSource="{Binding ShownServers}">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:AccountServerItemViewModel">

@@ -24,7 +24,7 @@ public sealed partial class AccountServerItemViewModel : ObservableObject
         _owner = owner;
         Server = server;
         _loading = true;
-        Selected = owner.Account.Servers.Any(l => l.ServerId == server.Id && l.Selected);
+        Selected = AccountServerLinks.IsSelected(owner.Account, server.Id);
         _loading = false;
         RefreshStatus();
         RefreshRunning();
@@ -63,14 +63,7 @@ public sealed partial class AccountServerItemViewModel : ObservableObject
     partial void OnSelectedChanged(bool value)
     {
         if (_loading) return;
-        var link = _owner.Account.Servers.FirstOrDefault(l => l.ServerId == Server.Id);
-        if (link is null)
-        {
-            link = new AccountServer { ServerId = Server.Id };
-            _owner.Account.Servers.Add(link);
-        }
-        link.Selected = value;
-        _state.SaveAccounts();
+        if (AccountServerLinks.SetSelected(_owner.Account, Server.Id, value)) _state.SaveAccounts();
         _owner.SelectionChanged();
     }
 

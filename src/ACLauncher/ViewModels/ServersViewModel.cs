@@ -111,12 +111,36 @@ public sealed partial class ServersViewModel : ObservableObject
     private bool CanRefresh() => !IsRefreshing;
 }
 
+/// <summary>Whether one account launches on the server selected in the Servers window.</summary>
+public sealed partial class AccountLinkViewModel(LauncherState state, Account account, Guid serverId) : ObservableObject
+{
+    public string DisplayName => account.DisplayName;
+
+    public bool Selected
+    {
+        get => AccountServerLinks.IsSelected(account, serverId);
+        set
+        {
+            if (!AccountServerLinks.SetSelected(account, serverId, value)) return;
+            state.SaveAccounts();
+            OnPropertyChanged();
+        }
+    }
+}
+
 /// <summary>One server in the editor. Published servers are read-only apart from hiding them.</summary>
 public sealed partial class ServerRowViewModel(LauncherState state, Server server) : ObservableObject
 {
     public static IReadOnlyList<EmulatorType> EmulatorOptions { get; } = Enum.GetValues<EmulatorType>();
 
     public Server Server { get; } = server;
+
+    /// <summary>One checkbox per account: whether that account launches on this server.</summary>
+    public IReadOnlyList<AccountLinkViewModel> AccountLinks { get; } =
+        state.Accounts.Select(a => new AccountLinkViewModel(state, a, server.Id)).ToList();
+
+    public bool HasAccounts => AccountLinks.Count > 0;
+
     public bool IsUser => Server.Source == ServerSource.User;
     public bool IsReadOnly => !IsUser;
     public string SourceLabel => IsUser ? "Your server" : $"From the {Server.ListName} list (read-only — use Copy to customise)";

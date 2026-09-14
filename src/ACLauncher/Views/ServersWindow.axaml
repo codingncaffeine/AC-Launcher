@@ -12,7 +12,8 @@
       <TextBlock Classes="label" Text="Search" VerticalAlignment="Center" Margin="0,0,8,0" />
       <TextBox Grid.Column="1" Text="{Binding Filter}" />
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="10,0,0,0">
-        <Button Content="Add server" Command="{Binding AddCommand}" />
+        <Button Content="Add custom server" Command="{Binding AddCommand}"
+                ToolTip.Tip="Add a server that is not in the published lists" />
         <Button Content="Copy" Command="{Binding CopyCommand}" ToolTip.Tip="Make an editable copy of the selected server" />
         <Button Content="Delete" Command="{Binding DeleteCommand}" />
         <Button Content="Refresh lists" Command="{Binding RefreshCommand}" />
@@ -50,6 +51,21 @@
               <DataTemplate x:DataType="vm:ServerRowViewModel">
                 <StackPanel Spacing="6">
                   <TextBlock Text="{Binding SourceLabel}" Classes="dim" TextWrapping="Wrap" />
+
+                  <Border Classes="panel" Padding="10,8" Margin="0,4,0,8">
+                    <StackPanel Spacing="4">
+                      <TextBlock Classes="label" Text="Launch on this server with" />
+                      <TextBlock Classes="dim" Text="No accounts yet. Add one on the main window first."
+                                 IsVisible="{Binding !HasAccounts}" TextWrapping="Wrap" />
+                      <ItemsControl ItemsSource="{Binding AccountLinks}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:AccountLinkViewModel">
+                            <CheckBox Content="{Binding DisplayName}" IsChecked="{Binding Selected}" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </Border>
 
                   <TextBlock Classes="label" Text="Name" />
                   <TextBox Text="{Binding Name}" IsReadOnly="{Binding IsReadOnly}" />

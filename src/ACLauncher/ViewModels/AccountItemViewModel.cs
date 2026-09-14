@@ -3,6 +3,7 @@ using ACLauncher.Core;
 using ACLauncher.Core.Servers;
 using ACLauncher.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 namespace ACLauncher.ViewModels;
 
@@ -63,8 +64,20 @@ public sealed partial class AccountItemViewModel : ObservableObject
         _enabledChanged();
     }
 
+    /// <summary>The account's server list shows its ticked servers; this switches to every server to pick from, and back.</summary>
+    public string ServerListToggleLabel => ShowAllServers ? "Show only this account's servers" : "Add or remove servers";
+
+    public string EmptyHint => ShowAllServers
+        ? "No servers available yet. Refresh the lists or add a custom server under Servers."
+        : "No servers ticked yet. Use Add or remove servers to pick one.";
+
+    [RelayCommand]
+    private void ToggleServerList() => ShowAllServers = !ShowAllServers;
+
     partial void OnShowAllServersChanged(bool value)
     {
+        OnPropertyChanged(nameof(ServerListToggleLabel));
+        OnPropertyChanged(nameof(EmptyHint));
         if (!_loading) ApplyServerFilter();
     }
 
