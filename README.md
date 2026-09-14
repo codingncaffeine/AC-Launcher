@@ -8,6 +8,8 @@ AC Launcher keeps your accounts and servers in one place and starts one or many 
 click. The Windows game client runs through [umu-launcher](https://github.com/Open-Wine-Components/umu-launcher),
 which runs Proton without Steam, so no Steam install is needed.
 
+![The AC Launcher main window](docs/screenshot1.png)
+
 ## Features
 
 - **Accounts** — save any number of accounts and tick the servers each one should launch on.
