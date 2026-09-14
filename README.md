@@ -17,7 +17,7 @@ which runs Proton without Steam, so no Steam install is needed.
   offline. Add your own servers, copy a published one to customise it, or hide the ones you never use.
 - **Server status** — each server is checked in the background and shown as up or down, with its response time.
 - **Proton without Steam** — pick any version of GE-Proton or UMU-Proton (Valve's Proton), from the latest back to
-  older releases, or follow the latest automatically. Downloads are checked against their published SHA-512 and
+  older releases, or follow the latest automatically. Downloads are checked against their published checksums and
   kept in the launcher's own folder; Proton builds already on the computer can be used too. The launcher keeps
   its own Wine prefix.
 - **Windowed start** — optionally sets the client to start in a window, which avoids the fullscreen DirectX error
@@ -70,6 +70,63 @@ The client stores its own settings in the prefix, under
   the same computer can see it while the game runs.
 
 Details, and how to report a vulnerability, are in [SECURITY.md](SECURITY.md).
+
+## Hardening details
+
+### Credentials
+
+- Passwords are stored through the freedesktop Secret Service with libsecret's `secret-tool`, which receives them on
+  standard input — never on a command line where other users could read them.
+- Without a keyring, passwords stay in `accounts.json` (mode `0600`). Passwords already in that file move into the
+  keyring as soon as one is available; the keyring copy is written before the file copy is removed.
+- The launcher masks the account password in everything it logs, including the output of umu-launcher, Proton and
+  Wine.
+
+### Downloads and network
+
+- **Proton** releases are verified against their `.sha512sum` file and GitHub's SHA-256 digest — both, when both are
+  published. Releases that publish neither are listed but refused. Archives are downloaded and unpacked in a staging
+  folder (`tar --no-same-owner`) and only moved into place once verified; a failed or cancelled install leaves
+  nothing behind.
+- **umu-launcher**'s self-contained release is verified against GitHub's SHA-256 digest, and unpacked with .NET's tar
+  reader, which refuses entries that would land outside the destination.
+- **Server lists** are only fetched over HTTPS — a list decides where accounts send their passwords. Lists are
+  parsed with DTD processing disabled and an 8 MB limit, and any response read whole is capped at 16 MB.
+- **Links** from lists or typed in are only opened if they are `http` or `https` links, so a list cannot make the
+  launcher open a local file or another URL handler.
+
+### Files
+
+- The launcher's folders are created with mode `0700` and every file it writes with `0600`; folders and files left
+  readable by an earlier version are tightened on start.
+- Settings are written to a new temporary file (created exclusively, so it cannot follow a planted file or link)
+  and renamed into place.
+
+### Build and supply chain
+
+- NuGet lock files record every package with its content hash. CI and release builds restore in locked mode, which
+  fails if a dependency changes without its lock file or a package's content differs from its recorded hash.
+- Packages are audited for known vulnerabilities on every restore; the .NET security analyzers run on every build
+  with warnings treated as errors.
+- CI builds, runs the test suite, checks for vulnerable packages and runs ShellCheck on every push.
+
+### Release packages
+
+- Every release package is installed into clean Ubuntu 24.04, Debian 13 and Arch Linux systems with only its declared
+  dependencies, then checked: every linked and runtime-loaded library present, the app launched, HTTPS working.
+- The `.deb` passes `lintian` with no errors or warnings. Its only overrides cover libraries that SkiaSharp and the
+  .NET runtime link statically.
+- The AUR `PKGBUILD` passes `namcap` with no errors or warnings.
+- Only the launcher and the runtime's `createdump` are executable. The shipped native binaries are position-independent
+  with non-executable stacks, and the SkiaSharp libraries are stripped.
+
+### Known limitations
+
+- The game client takes the password on its command line, so other users on the same computer can read it from the
+  process list while the game runs.
+- `PROTON_LOG` makes Proton write the game's command line, including the password, to a log file; the launcher warns
+  when it is set.
+- The game client and Proton run with your user's permissions; the launcher does not sandbox them.
 
 ## Building
 

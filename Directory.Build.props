@@ -18,7 +18,7 @@
     <NuGetAudit>true</NuGetAudit>
     <NuGetAuditMode>all</NuGetAuditMode>
     <NuGetAuditLevel>low</NuGetAuditLevel>
-    <Version>0.5.0</Version>
+    <Version>0.5.1</Version>
     <Authors>codingncaffeine</Authors>
     <Product>AC Launcher</Product>
   </PropertyGroup>
