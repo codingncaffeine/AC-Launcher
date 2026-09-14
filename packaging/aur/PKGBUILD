@@ -1,7 +1,7 @@
 # Maintainer: codingncaffeine <codingncaffeine@users.noreply.github.com>
 
 pkgname=ac-launcher-bin
-pkgver=0.5.0
+pkgver=0.5.1
 pkgrel=1
 pkgdesc="Launcher for Asheron's Call emulator servers that runs the game through Proton, without Steam"
 arch=('x86_64')
@@ -21,7 +21,7 @@ optdepends=('libsecret: keep account passwords in the desktop keyring instead of
 options=('!strip' '!debug')   # self-contained .NET payload
 source=("$url/releases/download/v$pkgver/ac-launcher-$pkgver-linux-x64.tar.gz")
 noextract=("ac-launcher-$pkgver-linux-x64.tar.gz")
-sha256sums=('fe516bf05f184cee8c06f008c24b9ad5f1b94b7d204a6450ae4ac17148c576b6')
+sha256sums=('d0a165c95a64a486fa25ee7c8e20e13df3c05ffba21dff3bce27383caa03d9c2')
 
 prepare() {
     rm -rf "$srcdir/payload"
