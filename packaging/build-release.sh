@@ -19,7 +19,7 @@ export SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct)}
 
 echo "── publish v$VER (self-contained linux-x64)"
 dotnet publish src/ACLauncher/ACLauncher.csproj -c Release -r linux-x64 --self-contained true \
-    -p:DebugType=none -p:ContinuousIntegrationBuild=true -o "$PUB" -v q
+    -p:DebugType=none -p:ContinuousIntegrationBuild=true -p:RestoreLockedMode=true -o "$PUB" -v q
 [[ -x $PUB/ACLauncher && -f $PUB/ACLauncher.dll ]] || { echo "publish produced no ACLauncher" >&2; exit 1; }
 # The runtime's LTTng event-tracing provider links liblttng-ust, which no desktop system needs;
 # without the provider the runtime simply skips LTTng tracing.

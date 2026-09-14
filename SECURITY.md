@@ -37,8 +37,13 @@ Do not open a public issue for them.
   `https` links.
 
 **Builds**
-- NuGet dependencies are pinned by lock files and audited for known vulnerabilities on every restore. The .NET
-  security analyzers run on every build, with warnings treated as errors.
+- NuGet lock files record every package and its content hash. CI and release builds restore in locked mode, which
+  fails if a project's dependencies change without its lock file, or if a downloaded package's content differs from
+  the recorded hash. Packages are audited for known vulnerabilities on every restore.
+- The .NET security analyzers run on every build, with warnings treated as errors, and CI runs the tests, a
+  vulnerable-package check and ShellCheck on every push.
+- Release packages are checked by installing them into clean Ubuntu, Debian and Arch systems, with `lintian` and
+  `namcap`.
 
 ## Known limitations
 

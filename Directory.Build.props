@@ -9,8 +9,12 @@
     <InvariantGlobalization>false</InvariantGlobalization>
     <!-- Every security rule the .NET analyzers have, as warnings (and so as errors). -->
     <AnalysisModeSecurity>All</AnalysisModeSecurity>
-    <!-- NuGet dependencies are pinned by a lock file, so a restore can never silently pick up different packages. -->
+    <!-- Lock files record every package and its content hash. A locked restore (CI, release builds) fails when a
+         project's dependencies change without its lock file (NU1004) or a package's content differs from the recorded
+         hash (NU1403). -->
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- Restore for the release runtime too, so the lock files cover what `dotnet publish -r linux-x64` uses. -->
+    <RuntimeIdentifiers>linux-x64</RuntimeIdentifiers>
     <NuGetAudit>true</NuGetAudit>
     <NuGetAuditMode>all</NuGetAuditMode>
     <NuGetAuditLevel>low</NuGetAuditLevel>
