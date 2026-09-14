@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=AC Launcher
+GenericName=Game Launcher
+Comment=Launch Asheron's Call on emulator servers
+Exec=ac-launcher
+Icon=ac-launcher
+Terminal=false
+Categories=Game;
+Keywords=Asheron's Call;ACE;GDLE;Proton;
+StartupWMClass=ACLauncher

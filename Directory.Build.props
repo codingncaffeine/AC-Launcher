@@ -7,7 +7,7 @@
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <InvariantGlobalization>false</InvariantGlobalization>
-    <Version>0.1.0</Version>
+    <Version>0.5.0</Version>
     <Authors>codingncaffeine</Authors>
     <Product>AC Launcher</Product>
   </PropertyGroup>

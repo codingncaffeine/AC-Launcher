@@ -33,6 +33,14 @@ which runs Proton without Steam, so no Steam install is needed.
 
 The first launch downloads the Steam Linux Runtime and Proton, about 1 GB, once.
 
+## Installing
+
+Downloads are on the [releases page](https://github.com/codingncaffeine/AC-Launcher/releases).
+
+- **Debian / Ubuntu** — `sudo apt install ./ac-launcher_<version>_amd64.deb`
+- **Arch Linux** — install `ac-launcher-bin` from the AUR, e.g. `yay -S ac-launcher-bin`
+- **Any distribution** — extract `ac-launcher-<version>-linux-x64.tar.gz` and run `ACLauncher` inside it
+
 ## Getting started
 
 1. Start AC Launcher and choose your **Asheron's Call folder** at the bottom of the window.

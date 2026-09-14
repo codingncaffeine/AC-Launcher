@@ -2,6 +2,9 @@
 bin/
 obj/
 dist/
+packaging/out/
+*.pkg.tar.zst
+*.deb
 *.user
 .vs/
 .vscode/
