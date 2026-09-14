@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Text;
 
 namespace ACLauncher.Core.Launching;
 
@@ -82,6 +83,71 @@ public static class ProcessTree
         var rest = stat[(close + 1)..].Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (rest.Length < 2 || !int.TryParse(rest[1], NumberStyles.None, CultureInfo.InvariantCulture, out var parent)) return null;
         return (stat[(open + 1)..close], parent);
+    }
+
+    /// <summary>True while the process exists and has not become a zombie.</summary>
+    public static bool IsAlive(int pid)
+    {
+        try
+        {
+            var stat = File.ReadAllText($"/proc/{pid}/stat");
+            var close = stat.LastIndexOf(')');
+            return close >= 0 && close + 2 < stat.Length && stat[close + 2] is not ('Z' or 'X');
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// The first descendant whose program — the first word of its command line, a Linux or Windows path — has this
+    /// file name. Under Wine the game client's process names <c>…\acclient.exe</c> there. Only that first word is
+    /// read, so the rest of the command line (the account password) is never touched.
+    /// </summary>
+    public static int? FindDescendantRunning(int rootPid, string fileName)
+    {
+        foreach (var pid in Descendants(rootPid))
+        {
+            if (ProgramFileName(ReadProgram(pid)) is { } name && string.Equals(name, fileName, StringComparison.OrdinalIgnoreCase))
+                return pid;
+        }
+        return null;
+    }
+
+    /// <summary>Kills one process and nothing else.</summary>
+    public static void KillProcess(int pid)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(pid);
+            process.Kill();
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            // Already gone.
+        }
+    }
+
+    internal static string? ProgramFileName(string? program)
+    {
+        if (string.IsNullOrEmpty(program)) return null;
+        var slash = program.LastIndexOfAny(['/', '\\']);
+        return slash < 0 ? program : program[(slash + 1)..];
+    }
+
+    private static string? ReadProgram(int pid)
+    {
+        try
+        {
+            var bytes = File.ReadAllBytes($"/proc/{pid}/cmdline");
+            var end = Array.IndexOf(bytes, (byte)0);
+            return Encoding.UTF8.GetString(bytes, 0, end < 0 ? bytes.Length : end);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     private static IEnumerable<string> SafeEnumerate(string path)

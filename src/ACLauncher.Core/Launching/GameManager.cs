@@ -30,18 +30,18 @@ public sealed record LaunchEnvironment(
         clientArguments = ClientArguments.Build(target.Server, target.Account, target.Password);
 
         // The client finds its .dat files relative to the working directory.
-        return BuildUmuStartInfo(clientPath, clientArguments, Path.GetDirectoryName(clientPath)!);
+        return BuildUmuStartInfo(clientPath, clientArguments, Path.GetDirectoryName(clientPath)!, launchesClient: true);
     }
 
     /// <summary>Runs a Wine program in the prefix, e.g. <c>wineboot -u</c> or <c>winecfg</c>.</summary>
     public ProcessStartInfo BuildToolStartInfo(string program, IReadOnlyList<string> arguments) =>
-        BuildUmuStartInfo(program, arguments, Directory.Exists(PrefixPath) ? PrefixPath : Path.GetTempPath());
+        BuildUmuStartInfo(program, arguments, Directory.Exists(PrefixPath) ? PrefixPath : Path.GetTempPath(), launchesClient: false);
 
     /// <summary>Proton has finished creating the prefix once its registry exists.</summary>
     public bool IsPrefixInitialized =>
         File.Exists(Path.Combine(PrefixPath, "system.reg")) || File.Exists(Path.Combine(PrefixPath, "pfx", "system.reg"));
 
-    private ProcessStartInfo BuildUmuStartInfo(string program, IReadOnlyList<string> arguments, string workingDirectory)
+    private ProcessStartInfo BuildUmuStartInfo(string program, IReadOnlyList<string> arguments, string workingDirectory, bool launchesClient)
     {
         var startInfo = new ProcessStartInfo(UmuRunPath)
         {
@@ -59,6 +59,10 @@ public sealed record LaunchEnvironment(
         startInfo.Environment["STORE"] = "none";
         if (string.IsNullOrWhiteSpace(ProtonPath)) startInfo.Environment.Remove("PROTONPATH");
         else startInfo.Environment["PROTONPATH"] = ProtonPath;
+        // umu's default verb, waitforexitandrun, waits for every program already running in the prefix to exit, so a
+        // second client would sit queued behind the first. "run" starts it at once, sharing the prefix's wineserver.
+        if (launchesClient && !ExtraEnvironment.ContainsKey("PROTON_VERB"))
+            startInfo.Environment["PROTON_VERB"] = "run";
         return startInfo;
     }
 }
@@ -66,22 +70,45 @@ public sealed record LaunchEnvironment(
 /// <summary>A running game client started by the launcher.</summary>
 public sealed class GameSession
 {
-    private readonly Process _process;
+    private int _ended;
 
-    internal GameSession(LaunchTarget target, Process process)
+    internal GameSession(LaunchTarget target, string clientFileName)
     {
         Target = target;
-        _process = process;
+        ClientFileName = clientFileName;
     }
 
     public LaunchTarget Target { get; }
     public DateTime StartedUtc { get; internal set; }
-    public int ProcessId { get; internal set; }
-    public int? ExitCode { get; internal set; }
 
+    /// <summary>The <c>umu-run</c> process that launched the client.</summary>
+    public int ProcessId { get; internal set; }
+
+    /// <summary>
+    /// The game client's own process, once it has started. The session follows this process: the launch that
+    /// started a prefix's shared wineserver keeps running until every client in the prefix has exited.
+    /// </summary>
+    public int? ClientProcessId { get; internal set; }
+
+    public int? ExitCode { get; internal set; }
+    public bool HasEnded => Volatile.Read(ref _ended) == 1;
+
+    internal string ClientFileName { get; }
+
+    /// <summary>True for the one caller that ends the session.</summary>
+    internal bool TryMarkEnded() => Interlocked.Exchange(ref _ended, 1) == 0;
+
+    /// <summary>Stops this client only — never the other clients sharing the prefix, or their wineserver.</summary>
     public void Stop()
     {
-        Log.Info($"Stopping {Target.Account.DisplayName} on {Target.Server.Name} (pid {ProcessId})");
+        if (ClientProcessId is { } client && ProcessTree.IsAlive(client))
+        {
+            Log.Info($"Stopping {Target.Account.DisplayName} on {Target.Server.Name} (client pid {client})");
+            ProcessTree.KillProcess(client);
+            return;
+        }
+        // Still starting (e.g. downloading Proton): nothing else runs in this launch yet.
+        Log.Info($"Stopping {Target.Account.DisplayName} on {Target.Server.Name} (launch pid {ProcessId})");
         ProcessTree.Kill(ProcessId);
     }
 }
@@ -117,7 +144,7 @@ public sealed class GameManager
                  $"(WINEPREFIX={environment.PrefixPath}, PROTONPATH={(string.IsNullOrWhiteSpace(environment.ProtonPath) ? "<umu default>" : environment.ProtonPath)})");
 
         var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
-        var session = new GameSession(target, process);
+        var session = new GameSession(target, Path.GetFileName(clientPath));
         // umu, Proton and Wine can echo the command line; the password never reaches the log.
         var password = target.Password;
         process.OutputDataReceived += (_, e) => { if (!string.IsNullOrEmpty(e.Data)) Log.Info($"[{name}] {ClientArguments.RedactLine(e.Data, password)}"); };
@@ -140,7 +167,43 @@ public sealed class GameManager
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
         SessionStarted?.Invoke(session);
+        _ = FollowClientAsync(session);
         return session;
+    }
+
+    /// <summary>How often a session looks for its client process and checks it is still running.</summary>
+    internal static readonly TimeSpan ClientPollInterval = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>Finds the session's game client under its launch, then ends the session when that client exits.</summary>
+    private async Task FollowClientAsync(GameSession session)
+    {
+        using var timer = new PeriodicTimer(ClientPollInterval);
+        while (await timer.WaitForNextTickAsync().ConfigureAwait(false))
+        {
+            if (session.HasEnded) return;
+            if (session.ClientProcessId is not { } client)
+            {
+                if (ProcessTree.FindDescendantRunning(session.ProcessId, session.ClientFileName) is { } found)
+                {
+                    session.ClientProcessId = found;
+                    Log.Info($"{session.Target.Account.DisplayName} on {session.Target.Server.Name}: game client started (pid {found})");
+                }
+                continue;
+            }
+            if (!ProcessTree.IsAlive(client))
+            {
+                EndSession(session, "game client exited");
+                return;
+            }
+        }
+    }
+
+    private void EndSession(GameSession session, string how)
+    {
+        if (!session.TryMarkEnded()) return;
+        lock (_gate) _sessions.Remove(session);
+        Log.Info($"{session.Target.Account.DisplayName} on {session.Target.Server.Name}: {how}");
+        SessionEnded?.Invoke(session);
     }
 
     /// <summary>
@@ -231,9 +294,8 @@ public sealed class GameManager
         catch (InvalidOperationException)
         {
         }
-        lock (_gate) _sessions.Remove(session);
-        Log.Info($"{session.Target.Account.DisplayName} on {session.Target.Server.Name} exited (code {session.ExitCode?.ToString() ?? "?"})");
         process.Dispose();
-        SessionEnded?.Invoke(session);
+        // Usually the client ended the session already; this covers a launch that never started one.
+        EndSession(session, $"launch exited (code {session.ExitCode?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "?"})");
     }
 }

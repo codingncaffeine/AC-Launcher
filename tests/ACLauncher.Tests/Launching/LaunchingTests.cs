@@ -133,6 +133,22 @@ public sealed class LaunchEnvironmentTests : IDisposable
         Assert.Equal("umu-default", psi.Environment["GAMEID"]);
         Assert.Equal("none", psi.Environment["STORE"]);
         Assert.Equal("fps", psi.Environment["DXVK_HUD"]);
+        Assert.Equal("run", psi.Environment["PROTON_VERB"]);
+    }
+
+    [Fact]
+    public void ToolsKeepUmusDefaultVerbAndAUserChosenVerbWins()
+    {
+        var game = MakeGame("default");
+        var tool = new LaunchEnvironment("umu-run", "/p", "GE-Proton", game, new Dictionary<string, string>())
+            .BuildToolStartInfo("winecfg", []);
+        Assert.False(tool.Environment.ContainsKey("PROTON_VERB"));
+
+        var custom = new LaunchEnvironment("umu-run", "/p", "GE-Proton", game,
+            new Dictionary<string, string> { ["PROTON_VERB"] = "waitforexitandrun" });
+        var psi = custom.BuildStartInfo(
+            new LaunchTarget(new Account { Username = "u" }, new Server { Name = "S", Address = "h:1" }, "p"), out _, out _);
+        Assert.Equal("waitforexitandrun", psi.Environment["PROTON_VERB"]);
     }
 
     [Fact]
@@ -166,6 +182,16 @@ public sealed class ProcessTreeTests
     [InlineData("99 (a) b (c)) R 42 99 99 0", "a) b (c)", 42)]
     public void ParsesStatNamesWithSpacesAndParentheses(string stat, string name, int parent) =>
         Assert.Equal((name, parent), ProcessTree.ParseStat(stat));
+
+    [Theory]
+    [InlineData("S:\\user\\Turbine\\Asheron's Call\\acclient.exe", "acclient.exe")]
+    [InlineData("/games/acclient.exe", "acclient.exe")]
+    [InlineData("acclient.exe", "acclient.exe")]
+    [InlineData("python3", "python3")]
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    public void ProgramFileNameHandlesWindowsAndLinuxPaths(string? program, string? expected) =>
+        Assert.Equal(expected, ProcessTree.ProgramFileName(program));
 
     [Fact]
     public void FindsChildrenOfARealProcess()
