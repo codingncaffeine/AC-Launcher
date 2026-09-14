@@ -2,12 +2,19 @@ using System.Collections.ObjectModel;
 using ACLauncher.Core;
 using ACLauncher.Core.Launching;
 using ACLauncher.Core.Proton;
+using ACLauncher.Core.Secrets;
 using ACLauncher.Services;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 namespace ACLauncher.ViewModels;
+
+/// <summary>What the account dialog returns.</summary>
+public sealed record AccountEdit(string Username, string Password, string? Alias)
+{
+    public override string ToString() => $"AccountEdit {{ Username = {Username}, Alias = {Alias} }}";
+}
 
 public sealed partial class MainViewModel : ObservableObject
 {
@@ -71,6 +78,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         _ = State.RefreshServerListsAsync();
         _ = State.RunStatusLoopAsync();
+        _ = State.MigratePasswordsAsync();
     }
 
     /// <summary>Re-reads the values this view shows from the settings, e.g. after the settings window saved.</summary>
@@ -126,8 +134,10 @@ public sealed partial class MainViewModel : ObservableObject
         RefreshRunning();
     }
 
-    public void AddAccount(Account account)
+    public async Task AddAccountAsync(AccountEdit edit)
     {
+        var account = new Account { Username = edit.Username, Alias = edit.Alias };
+        await State.Secrets.SetPasswordAsync(account, edit.Password, State.ShutdownToken);
         State.Accounts.Add(account);
         State.SaveAccounts();
         RebuildAccounts();
@@ -136,14 +146,33 @@ public sealed partial class MainViewModel : ObservableObject
         StatusText = $"Added {account.DisplayName}. Tick the servers it should launch on.";
     }
 
-    public void AccountEdited()
+    public async Task UpdateAccountAsync(AccountItemViewModel item, AccountEdit edit)
     {
+        var account = item.Account;
+        account.Username = edit.Username;
+        account.Alias = edit.Alias;
+        await State.Secrets.SetPasswordAsync(account, edit.Password, State.ShutdownToken);
         State.SaveAccounts();
         RebuildAccounts();
     }
 
-    public void DeleteAccount(AccountItemViewModel item)
+    /// <summary>The stored password to show in the edit dialog; empty (with a status message) if it cannot be read.</summary>
+    public async Task<string> GetPasswordForEditAsync(Account account)
     {
+        try
+        {
+            return await State.Secrets.GetPasswordAsync(account, State.ShutdownToken);
+        }
+        catch (SecretStoreException e)
+        {
+            StatusText = e.Message;
+            return "";
+        }
+    }
+
+    public async Task DeleteAccountAsync(AccountItemViewModel item)
+    {
+        await State.Secrets.RemoveAsync(item.Account, State.ShutdownToken);
         State.Accounts.Remove(item.Account);
         State.SaveAccounts();
         RebuildAccounts();
@@ -173,15 +202,15 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanLaunch))]
     private async Task LaunchAsync()
     {
-        var targets = (
+        var pairs = (
             from account in State.Accounts
             where account.Enabled
             from link in account.Servers
             where link.Selected
             let server = State.FindServer(link.ServerId)
             where server is not null
-            select new LaunchTarget(account, server)).ToList();
-        if (targets.Count == 0)
+            select (Account: account, Server: server)).ToList();
+        if (pairs.Count == 0)
         {
             StatusText = "Tick an account and at least one of its servers first.";
             return;
@@ -193,6 +222,29 @@ public sealed partial class MainViewModel : ObservableObject
         var progress = new Progress<string>(text => StatusText = text);
         try
         {
+            // Passwords first, so a keyring that cannot answer stops the launch before any download.
+            var passwords = new Dictionary<Guid, string?>();
+            var targets = new List<LaunchTarget>();
+            foreach (var (account, server) in pairs)
+            {
+                if (!passwords.TryGetValue(account.Id, out var password))
+                {
+                    try
+                    {
+                        password = await State.Secrets.GetPasswordAsync(account, token);
+                    }
+                    catch (SecretStoreException e)
+                    {
+                        Log.Error(e.Message);
+                        StatusText = e.Message;
+                        password = null;
+                    }
+                    passwords[account.Id] = password;
+                }
+                if (password is not null) targets.Add(new LaunchTarget(account, server, password));
+            }
+            if (targets.Count == 0) return;
+
             var proton = await ResolveProtonAsync(progress, token);
             if (proton is null) return;
             var environment = await EnsureUmuAsync(proton, progress, token);
@@ -259,7 +311,7 @@ public sealed partial class MainViewModel : ObservableObject
         try
         {
             var releases = await ProtonReleases.GetAsync(State.Http, family, AppPaths.CacheDir, forceRefresh: false, token);
-            latest = releases.FirstOrDefault(r => !r.Prerelease);
+            latest = releases.FirstOrDefault(r => !r.Prerelease && r.IsVerifiable);
         }
         catch (ProtonDownloadException e)
         {

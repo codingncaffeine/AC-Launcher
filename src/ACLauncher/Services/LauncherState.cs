@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using ACLauncher.Core;
 using ACLauncher.Core.Launching;
+using ACLauncher.Core.Secrets;
 using ACLauncher.Core.Servers;
 
 namespace ACLauncher.Services;
@@ -23,6 +24,39 @@ public sealed class LauncherState : IDisposable
         UserServersDocument = servers;
         PublishedServers = ServerCatalog.LoadCached(settings.ServerLists, AppPaths.ServerListCacheDir);
         Http.DefaultRequestHeaders.UserAgent.ParseAdd("ac-launcher/" + typeof(LauncherState).Assembly.GetName().Version?.ToString(3));
+        MigrateStoredData();
+    }
+
+    /// <summary>Brings files written by earlier versions up to date.</summary>
+    private void MigrateStoredData()
+    {
+        var insecure = Settings.ServerLists.Where(s => !s.IsSecure).ToList();
+        if (insecure.Count > 0)
+        {
+            foreach (var source in insecure) Settings.ServerLists.Remove(source);
+            Log.Info($"Stopped using server lists not served over HTTPS: {string.Join(", ", insecure.Select(s => s.Url))}");
+            SaveSettings();
+        }
+
+        // 0.5.0 derived published-server ids with MD5; carry account links and hidden servers over to the new ids.
+        var remap = new Dictionary<Guid, Guid>();
+        foreach (var server in PublishedServers) remap.TryAdd(Server.LegacyPublishedId(server.Name), server.Id);
+        var linksMoved = 0;
+        foreach (var link in Accounts.SelectMany(a => a.Servers))
+        {
+            if (remap.TryGetValue(link.ServerId, out var id)) { link.ServerId = id; linksMoved++; }
+        }
+        if (linksMoved > 0)
+        {
+            SaveAccounts();
+            Log.Info($"Updated {linksMoved} account server links to the current server ids");
+        }
+        var hidden = Settings.HiddenServers.Select(id => remap.GetValueOrDefault(id, id)).Distinct().ToList();
+        if (!hidden.SequenceEqual(Settings.HiddenServers))
+        {
+            Settings.HiddenServers = hidden;
+            SaveSettings();
+        }
     }
 
     public LauncherSettings Settings { get; private set; }
@@ -30,7 +64,11 @@ public sealed class LauncherState : IDisposable
     public ServersDocument UserServersDocument { get; }
     public IReadOnlyList<Server> PublishedServers { get; private set; }
     public GameManager Games { get; } = new();
-    public HttpClient Http { get; } = new() { Timeout = TimeSpan.FromMinutes(15) };
+
+    /// <summary>Proton archives are streamed; anything read whole (lists, release data, checksums) is capped.</summary>
+    public HttpClient Http { get; } = new() { Timeout = TimeSpan.FromMinutes(15), MaxResponseContentBufferSize = 16 * 1024 * 1024 };
+
+    public AccountSecrets Secrets { get; } = new(new SecretToolStore());
     public CancellationToken ShutdownToken => _shutdown.Token;
 
     public List<Account> Accounts => AccountsDocument.Accounts;
@@ -56,7 +94,19 @@ public sealed class LauncherState : IDisposable
     public ServerStatus StatusOf(Guid serverId) => _statuses.GetValueOrDefault(serverId, ServerStatus.Unknown);
 
     public void SaveSettings() => Save(() => JsonStore.Save(AppPaths.SettingsFile, Settings));
-    public void SaveAccounts() => Save(() => JsonStore.Save(AppPaths.AccountsFile, AccountsDocument, isPrivate: true));
+    public void SaveAccounts() => Save(() => JsonStore.Save(AppPaths.AccountsFile, AccountsDocument));
+
+    /// <summary>Moves any password still kept in accounts.json into the desktop keyring.</summary>
+    public async Task MigratePasswordsAsync()
+    {
+        try
+        {
+            if (await Secrets.MigrateAsync(Accounts, ShutdownToken)) SaveAccounts();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
     public void SaveServers() => Save(() => JsonStore.Save(AppPaths.ServersFile, UserServersDocument));
 
     public void ReplaceSettings(LauncherSettings settings)

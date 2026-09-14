@@ -25,11 +25,23 @@ public static class Log
             if (_writer is not null) return;
             try
             {
-                Directory.CreateDirectory(directory);
+                AppPaths.CreatePrivateDirectory(directory);
                 var path = Path.Combine(directory, "ac-launcher.log");
                 if (File.Exists(path) && new FileInfo(path).Length > RotateBytes)
                     File.Move(path, path + ".1", overwrite: true);
-                var stream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+                // The log names accounts and servers: owner-only, including a file an older version left readable.
+                var stream = new FileStream(path, new FileStreamOptions
+                {
+                    Mode = FileMode.Append,
+                    Access = FileAccess.Write,
+                    Share = FileShare.ReadWrite,
+                    UnixCreateMode = AppPaths.PrivateFileMode,
+                });
+                if ((File.GetUnixFileMode(path) & ~AppPaths.PrivateFileMode) != 0)
+                    File.SetUnixFileMode(path, AppPaths.PrivateFileMode);
+                foreach (var old in Directory.GetFiles(directory))
+                    if ((File.GetUnixFileMode(old) & ~AppPaths.PrivateFileMode) != 0)
+                        File.SetUnixFileMode(old, AppPaths.PrivateFileMode);
                 _writer = new StreamWriter(stream) { AutoFlush = true };
                 FilePath = path;
             }

@@ -41,18 +41,33 @@ public sealed class Server
     /// A published server's id is derived from its name, so account selections survive list refreshes
     /// and the same server keeps its id on every machine.
     /// </summary>
-    public static Guid PublishedId(string serverName)
+    public static Guid PublishedId(string serverName) =>
+        new(SHA256.HashData(Encoding.UTF8.GetBytes("published:" + NormalizeName(serverName))).AsSpan(0, 16));
+
+    /// <summary>The id version 0.5.0 derived; used only to carry its account links over to <see cref="PublishedId"/>.</summary>
+    public static Guid LegacyPublishedId(string serverName)
     {
-        var bytes = MD5.HashData(Encoding.UTF8.GetBytes("published:" + serverName.Trim().ToLowerInvariant()));
-        return new Guid(bytes);
+#pragma warning disable CA5351 // Not a security use: reproduces identifiers an earlier version wrote.
+        return new Guid(MD5.HashData(Encoding.UTF8.GetBytes("published:" + NormalizeName(serverName))));
+#pragma warning restore CA5351
     }
+
+    private static string NormalizeName(string name) => name.Trim().ToLowerInvariant();
 }
 
 public sealed class Account
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Username { get; set; } = "";
+
+    /// <summary>
+    /// The password, when it is kept in <c>accounts.json</c>. Empty when <see cref="PasswordInKeyring"/> is set,
+    /// because the desktop keyring holds it instead.
+    /// </summary>
     public string Password { get; set; } = "";
+
+    public bool PasswordInKeyring { get; set; }
+
     public string? Alias { get; set; }
 
     /// <summary>Whether the account is ticked for the next launch.</summary>
@@ -132,10 +147,15 @@ public sealed class ServerListSource
     public EmulatorType DefaultEmulator { get; set; } = EmulatorType.ACE;
     public bool Enabled { get; set; } = true;
 
+    /// <summary>
+    /// A list decides where accounts send their passwords, so only lists fetched over HTTPS are used: over plain
+    /// HTTP anyone on the network path could add a server of their own.
+    /// </summary>
+    [JsonIgnore]
+    public bool IsSecure => Uri.TryCreate(Url, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps;
+
     public static List<ServerListSource> Defaults() =>
     [
         new() { Name = "Community", Url = "https://raw.githubusercontent.com/acresources/serverslist/master/Servers.xml", DefaultEmulator = EmulatorType.ACE },
-        new() { Name = "ACE", Url = "http://thwargle.com/thwarglauncher/ACEPublishedServerInfo.xml", DefaultEmulator = EmulatorType.ACE },
-        new() { Name = "GDLE", Url = "http://thwargle.com/thwarglauncher/GDLPublishedServerInfo.xml", DefaultEmulator = EmulatorType.GDLE },
     ];
 }

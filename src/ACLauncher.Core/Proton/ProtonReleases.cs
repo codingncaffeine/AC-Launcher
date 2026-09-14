@@ -38,6 +38,8 @@ public static class ProtonChoiceValue
     };
 }
 
+/// <param name="ChecksumUrl">The release's own <c>.sha512sum</c> file, if it publishes one.</param>
+/// <param name="ArchiveDigest">GitHub's digest of the archive (<c>sha256:…</c>), if it has one.</param>
 public sealed record ProtonRelease(
     ProtonFamily Family,
     string Tag,
@@ -46,7 +48,13 @@ public sealed record ProtonRelease(
     string ArchiveName,
     string ArchiveUrl,
     long ArchiveSize,
-    string? ChecksumUrl);
+    string? ChecksumUrl,
+    string? ArchiveDigest = null)
+{
+    /// <summary>Only a release that can be checked against a published checksum is ever installed.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsVerifiable => ChecksumUrl is not null || ArchiveDigest is not null;
+}
 
 /// <summary>Lists the releases of a Proton build from GitHub, cached for an hour.</summary>
 public static class ProtonReleases
@@ -136,7 +144,10 @@ public static class ProtonReleases
                 a.GetProperty("name").GetString()!,
                 a.GetProperty("browser_download_url").GetString()!,
                 a.GetProperty("size").GetInt64(),
-                checksumUrl));
+                checksumUrl,
+                a.TryGetProperty("digest", out var digest) && digest.ValueKind == JsonValueKind.String
+                    ? Launching.Umu.ParseSha256Digest(digest.GetString()) is { } hex ? "sha256:" + hex : null
+                    : null));
         }
         return releases;
     }

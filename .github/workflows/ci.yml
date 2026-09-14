@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore (locked)
+        run: dotnet restore ACLauncher.slnx --locked-mode
+
+      - name: Build (analyzers on, warnings are errors)
+        run: dotnet build ACLauncher.slnx -c Release --no-restore
+
+      - name: Test
+        run: tests/ACLauncher.Tests/bin/Release/net10.0/ACLauncher.Tests
+
+      - name: Vulnerable packages
+        run: |
+          dotnet list ACLauncher.slnx package --vulnerable --include-transitive | tee vulnerable.txt
+          ! grep -q -E '^\s+>' vulnerable.txt
+
+      - name: ShellCheck
+        run: shellcheck -x -S style packaging/*.sh

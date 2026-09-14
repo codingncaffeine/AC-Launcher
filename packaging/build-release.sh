@@ -56,7 +56,7 @@ Priority: optional
 Architecture: amd64
 Installed-Size: $INSTALLED_KB
 Depends: libc6, libgcc-s1, libstdc++6, libicu76 | libicu74 | libicu72 | libicu70, libssl3t64 | libssl3, ca-certificates, libx11-6, libxext6, libxrandr2, libxi6, libxcursor1, libxfixes3, libice6, libsm6, libfontconfig1, tar, python3, xdg-utils
-Recommends: libgl1, libegl1, libgtk-3-0t64 | libgtk-3-0
+Recommends: libgl1, libegl1, libgtk-3-0t64 | libgtk-3-0, libsecret-tools
 Maintainer: codingncaffeine <codingncaffeine@users.noreply.github.com>
 Homepage: https://github.com/codingncaffeine/AC-Launcher
 Description: Launcher for Asheron's Call emulator servers

@@ -14,7 +14,8 @@ conflicts=('ac-launcher')
 depends=('glibc' 'libgcc' 'libstdc++' 'icu' 'openssl' 'ca-certificates' 'fontconfig'
          'libx11' 'libxext' 'libxrandr' 'libxi' 'libxcursor' 'libxfixes' 'libice' 'libsm'
          'ttf-font' 'hicolor-icon-theme' 'tar' 'python' 'xdg-utils')
-optdepends=('umu-launcher: use the system umu-launcher instead of the copy the launcher downloads'
+optdepends=('libsecret: keep account passwords in the desktop keyring instead of the accounts file'
+            'umu-launcher: use the system umu-launcher instead of the copy the launcher downloads'
             'gtk3: folder picker when no desktop portal is available'
             'libglvnd: GPU-accelerated drawing')
 options=('!strip' '!debug')   # self-contained .NET payload

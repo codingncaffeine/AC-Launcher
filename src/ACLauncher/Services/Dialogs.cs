@@ -26,8 +26,20 @@ public static class Dialogs
     public static async Task<bool> ConfirmAsync(Window owner, string title, string message, string confirm = "OK") =>
         await Show(owner, title, message, [confirm, "Cancel"]) == confirm;
 
-    /// <summary>Opens a URL or folder with the desktop's default handler.</summary>
-    public static void OpenExternal(string target)
+    /// <summary>Opens a web link in the browser. Anything but an http or https link is refused, whatever its source.</summary>
+    public static void OpenWebLink(string? url)
+    {
+        if (SafeLinks.TryGetWebLink(url, out var uri)) OpenExternal(uri.AbsoluteUri);
+        else Log.Warn($"Did not open '{url}': only http and https links are opened");
+    }
+
+    /// <summary>Opens an existing local folder in the file manager.</summary>
+    public static void OpenFolder(string path)
+    {
+        if (Directory.Exists(path)) OpenExternal(Path.GetFullPath(path));
+    }
+
+    private static void OpenExternal(string target)
     {
         try
         {

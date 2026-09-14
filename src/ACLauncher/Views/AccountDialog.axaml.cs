@@ -1,27 +1,25 @@
 using ACLauncher.Core;
+using ACLauncher.ViewModels;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 
 namespace ACLauncher.Views;
 
-/// <summary>Adds or edits an account. Closes with the account, or null when cancelled.</summary>
+/// <summary>Adds or edits an account. Closes with an <see cref="AccountEdit"/>, or null when cancelled.</summary>
 public partial class AccountDialog : Window
 {
-    private readonly Account? _existing;
-
-    public AccountDialog() : this(null)
+    public AccountDialog() : this(null, "")
     {
     }
 
-    public AccountDialog(Account? existing)
+    public AccountDialog(Account? existing, string currentPassword)
     {
         InitializeComponent();
-        _existing = existing;
         Title = existing is null ? "Add account" : "Edit account";
         if (existing is not null)
         {
             UsernameBox.Text = existing.Username;
-            PasswordBox.Text = existing.Password;
+            PasswordBox.Text = currentPassword;
             AliasBox.Text = existing.Alias;
         }
         Opened += (_, _) => UsernameBox.Focus();
@@ -45,18 +43,7 @@ public partial class AccountDialog : Window
             ErrorText.IsVisible = true;
             return;
         }
-
-        if (_existing is not null)
-        {
-            _existing.Username = username;
-            _existing.Password = password;
-            _existing.Alias = alias;
-            Close(_existing);
-        }
-        else
-        {
-            Close(new Account { Username = username, Password = password, Alias = alias });
-        }
+        Close(new AccountEdit(username, password, alias));
     }
 
     private void OnCancel(object? sender, RoutedEventArgs e) => Close(null);

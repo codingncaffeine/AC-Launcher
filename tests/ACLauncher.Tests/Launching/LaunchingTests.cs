@@ -11,14 +11,14 @@ public sealed class ClientArgumentsTests
     public void AceUsesSeparateUserPasswordAndHostPort()
     {
         var server = new Server { Name = "S", Address = "play.example.org:9000", Emulator = EmulatorType.ACE };
-        Assert.Equal(["-a", "player", "-v", "secret", "-h", "play.example.org:9000", "-rodat", "off"], ClientArguments.Build(server, Account()));
+        Assert.Equal(["-a", "player", "-v", "secret", "-h", "play.example.org:9000", "-rodat", "off"], ClientArguments.Build(server, Account(), "secret"));
     }
 
     [Fact]
     public void GdleUsesSplitHostPortAndCombinedCredentials()
     {
         var server = new Server { Name = "S", Address = "gdl.example.org:9050", Emulator = EmulatorType.GDLE, Rodat = true };
-        Assert.Equal(["-h", "gdl.example.org", "-p", "9050", "-a", "player:secret", "-rodat", "on"], ClientArguments.Build(server, Account()));
+        Assert.Equal(["-h", "gdl.example.org", "-p", "9050", "-a", "player:secret", "-rodat", "on"], ClientArguments.Build(server, Account(), "secret"));
     }
 
     [Theory]
@@ -28,14 +28,14 @@ public sealed class ClientArgumentsTests
     public void RejectsAccountsTheClientCannotAccept(string user, string password, string expected)
     {
         var server = new Server { Name = "S", Address = "h:1" };
-        var e = Assert.Throws<LaunchException>(() => ClientArguments.Build(server, Account(user, password)));
+        var e = Assert.Throws<LaunchException>(() => ClientArguments.Build(server, Account(user, password), password));
         Assert.Contains(expected, e.Message);
     }
 
     [Fact]
     public void RejectsInvalidServerAddress()
     {
-        var e = Assert.Throws<LaunchException>(() => ClientArguments.Build(new Server { Name = "S", Address = "nohost" }, Account()));
+        var e = Assert.Throws<LaunchException>(() => ClientArguments.Build(new Server { Name = "S", Address = "nohost" }, Account(), "secret"));
         Assert.Contains("invalid address", e.Message);
     }
 
@@ -119,8 +119,8 @@ public sealed class LaunchEnvironmentTests : IDisposable
         var game = MakeGame("default");
         var env = new LaunchEnvironment("/usr/bin/umu-run", "/data/prefix", "GE-Proton", game,
             new Dictionary<string, string> { ["DXVK_HUD"] = "fps", ["WINEPREFIX"] = "/ignored" });
-        var target = new LaunchTarget(new Account { Username = "player", Password = "pw" },
-            new Server { Name = "S", Address = "h.example:9000" });
+        var target = new LaunchTarget(new Account { Username = "player" },
+            new Server { Name = "S", Address = "h.example:9000" }, "pw");
 
         var psi = env.BuildStartInfo(target, out var client, out _);
 
@@ -141,8 +141,8 @@ public sealed class LaunchEnvironmentTests : IDisposable
         var fallback = MakeGame("default");
         var special = MakeGame("special");
         var env = new LaunchEnvironment("umu-run", "/p", "", fallback, new Dictionary<string, string>());
-        var target = new LaunchTarget(new Account { Username = "u", Password = "p" },
-            new Server { Name = "S", Address = "h:1", GameDirectory = special });
+        var target = new LaunchTarget(new Account { Username = "u" },
+            new Server { Name = "S", Address = "h:1", GameDirectory = special }, "p");
 
         var psi = env.BuildStartInfo(target, out var client, out _);
 
@@ -154,7 +154,7 @@ public sealed class LaunchEnvironmentTests : IDisposable
     public void RefusesWhenNoGameFolderIsSet()
     {
         var env = new LaunchEnvironment("umu-run", "/p", "GE-Proton", null, new Dictionary<string, string>());
-        var target = new LaunchTarget(new Account { Username = "u", Password = "p" }, new Server { Name = "S", Address = "h:1" });
+        var target = new LaunchTarget(new Account { Username = "u" }, new Server { Name = "S", Address = "h:1" }, "p");
         Assert.Throws<LaunchException>(() => env.BuildStartInfo(target, out _, out _));
     }
 }

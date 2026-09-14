@@ -33,16 +33,21 @@ public static class JsonStore
 
     /// <summary>
     /// Writes to a temporary file and renames it over the target, so a crash never leaves half a file.
-    /// A private document is created readable by the owner only.
+    /// Every document is created readable by the owner only.
     /// </summary>
-    public static void Save<T>(string path, T value, bool isPrivate = false)
+    public static void Save<T>(string path, T value)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        AppPaths.CreatePrivateDirectory(Path.GetDirectoryName(path)!);
         var temp = path + ".tmp";
         File.Delete(temp);
-        var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None };
-        if (isPrivate && !OperatingSystem.IsWindows())
-            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        // CreateNew refuses to follow a file or link planted at the temporary name.
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.CreateNew,
+            Access = FileAccess.Write,
+            Share = FileShare.None,
+            UnixCreateMode = AppPaths.PrivateFileMode,
+        };
         using (var stream = new FileStream(temp, options))
         {
             JsonSerializer.Serialize(stream, value, Options);

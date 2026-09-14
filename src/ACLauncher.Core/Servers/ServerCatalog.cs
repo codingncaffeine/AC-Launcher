@@ -17,7 +17,7 @@ public static class ServerCatalog
 
     /// <summary>The servers from the cached copies only; used at startup before any download finishes.</summary>
     public static IReadOnlyList<Server> LoadCached(IEnumerable<ServerListSource> sources, string cacheDir) =>
-        Merge(sources.Where(s => s.Enabled).Select(s => ReadCache(cacheDir, s)));
+        Merge(sources.Where(s => s.Enabled && s.IsSecure).Select(s => ReadCache(cacheDir, s)));
 
     /// <summary>
     /// Downloads every enabled list. A list that cannot be downloaded or parsed falls back to its cached
@@ -28,6 +28,11 @@ public static class ServerCatalog
     {
         var tasks = sources.Where(s => s.Enabled).Select(async source =>
         {
+            if (!source.IsSecure)
+            {
+                Log.Warn($"Server list {source.Name} is not served over HTTPS, so it is not used: {source.Url}");
+                return (IReadOnlyList<Server>)[];
+            }
             try
             {
                 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

@@ -34,7 +34,7 @@ public partial class LogWindow : Window
         if (_lines.Count > 0) LogList.ScrollIntoView(_lines.Count - 1);
     }
 
-    private void OnOpenFolder(object? sender, RoutedEventArgs e) => Dialogs.OpenExternal(AppPaths.LogDir);
+    private void OnOpenFolder(object? sender, RoutedEventArgs e) => Dialogs.OpenFolder(AppPaths.LogDir);
 
     private void OnClear(object? sender, RoutedEventArgs e) => _lines.Clear();
 

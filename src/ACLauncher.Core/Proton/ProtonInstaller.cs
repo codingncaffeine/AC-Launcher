@@ -36,8 +36,9 @@ public static class ProtonInstaller
         ListInstalled(root).FirstOrDefault(p => p.Family == family)?.Directory;
 
     /// <summary>
-    /// Downloads a release, checks it against its published SHA-512, and unpacks it to
-    /// <c>&lt;root&gt;/&lt;tag&gt;</c>. Nothing is left behind if any step fails or is cancelled.
+    /// Downloads a release, checks it against every checksum published for it (its <c>.sha512sum</c> file and
+    /// GitHub's SHA-256 digest), and unpacks it to <c>&lt;root&gt;/&lt;tag&gt;</c>. A release with no published
+    /// checksum is refused. Nothing is left behind if any step fails or is cancelled.
     /// </summary>
     /// <returns>The installed build's directory.</returns>
     public static async Task<string> InstallAsync(HttpClient http, ProtonRelease release, IProgress<ProtonInstallProgress>? progress,
@@ -47,27 +48,31 @@ public static class ProtonInstaller
         ValidateName(release.Tag);
         var target = Path.Combine(root, release.Tag);
         if (File.Exists(Path.Combine(target, "proton"))) return target;
+        if (!release.IsVerifiable)
+            throw new ProtonDownloadException($"{release.Tag} publishes no checksum, so it cannot be verified and was not installed.");
 
-        Directory.CreateDirectory(root);
+        AppPaths.CreatePrivateDirectory(root);
         var work = Path.Combine(root, $".install-{release.Tag}");
         if (Directory.Exists(work)) Directory.Delete(work, recursive: true);
         Directory.CreateDirectory(work);
         try
         {
-            string? expected = null;
+            string? expectedSha512 = null;
             if (release.ChecksumUrl is not null)
             {
                 progress?.Report(new($"Downloading the {release.Tag} checksum", 0, null));
-                expected = ParseChecksum(await http.GetStringAsync(release.ChecksumUrl, cancellationToken).ConfigureAwait(false))
+                expectedSha512 = ParseChecksum(await http.GetStringAsync(release.ChecksumUrl, cancellationToken).ConfigureAwait(false))
                     ?? throw new ProtonDownloadException($"The checksum published for {release.Tag} could not be read.");
             }
+            var expectedSha256 = release.ArchiveDigest is { } digest ? Launching.Umu.ParseSha256Digest(digest) : null;
+            if (expectedSha512 is null && expectedSha256 is null)
+                throw new ProtonDownloadException($"{release.Tag} publishes no usable checksum, so it was not installed.");
 
             var archive = Path.Combine(work, Path.GetFileName(release.ArchiveName));
-            var actual = await DownloadAsync(http, release, archive, progress, cancellationToken).ConfigureAwait(false);
-            if (expected is not null && !string.Equals(expected, actual, StringComparison.OrdinalIgnoreCase))
+            var (sha512, sha256) = await DownloadAsync(http, release, archive, progress, cancellationToken).ConfigureAwait(false);
+            if ((expectedSha512 is not null && !string.Equals(expectedSha512, sha512, StringComparison.OrdinalIgnoreCase)) ||
+                (expectedSha256 is not null && !string.Equals(expectedSha256, sha256, StringComparison.OrdinalIgnoreCase)))
                 throw new ProtonDownloadException($"{release.ArchiveName} did not match its published checksum, so it was discarded. Try again.");
-            if (expected is null)
-                Log.Warn($"{release.Tag} publishes no checksum; installing it unverified");
 
             progress?.Report(new($"Unpacking {release.Tag}", 0, null));
             var unpacked = Path.Combine(work, "unpacked");
@@ -78,7 +83,7 @@ public static class ProtonInstaller
 
             if (Directory.Exists(target)) Directory.Delete(target, recursive: true);
             Directory.Move(protonDir, target);
-            Log.Info($"Installed {release.Tag} to {target}");
+            Log.Info($"Installed {release.Tag} to {target} (verified: {(expectedSha512 is not null ? "SHA-512" : "")}{(expectedSha512 is not null && expectedSha256 is not null ? " + " : "")}{(expectedSha256 is not null ? "SHA-256" : "")})");
             progress?.Report(new($"Installed {release.Tag}", 0, null));
             return target;
         }
@@ -125,7 +130,7 @@ public static class ProtonInstaller
             throw new ArgumentException($"'{name}' is not a valid Proton build name.", nameof(name));
     }
 
-    private static async Task<string> DownloadAsync(HttpClient http, ProtonRelease release, string destination,
+    private static async Task<(string Sha512, string Sha256)> DownloadAsync(HttpClient http, ProtonRelease release, string destination,
         IProgress<ProtonInstallProgress>? progress, CancellationToken cancellationToken)
     {
         using var response = await http.GetAsync(release.ArchiveUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
@@ -133,32 +138,43 @@ public static class ProtonInstaller
         long? total = response.Content.Headers.ContentLength ?? (release.ArchiveSize > 0 ? release.ArchiveSize : null);
         var message = $"Downloading {release.Tag}";
 
-        await using var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        await using var file = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1 << 16, useAsync: true);
-        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA512);
-        var buffer = new byte[1 << 16];
-        long done = 0, reported = 0;
-        progress?.Report(new(message, 0, total));
-        int read;
-        while ((read = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+        var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        await using (source.ConfigureAwait(false))
         {
-            await file.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
-            hash.AppendData(buffer, 0, read);
-            done += read;
-            if (done - reported >= ProgressStep)
+            var file = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1 << 16, useAsync: true);
+            await using (file.ConfigureAwait(false))
             {
-                reported = done;
+                using var sha512 = IncrementalHash.CreateHash(HashAlgorithmName.SHA512);
+                using var sha256 = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+                var buffer = new byte[1 << 16];
+                long done = 0, reported = 0;
+                progress?.Report(new(message, 0, total));
+                int read;
+                while ((read = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+                {
+                    await file.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                    sha512.AppendData(buffer, 0, read);
+                    sha256.AppendData(buffer, 0, read);
+                    done += read;
+                    if (done - reported >= ProgressStep)
+                    {
+                        reported = done;
+                        progress?.Report(new(message, done, total));
+                    }
+                }
                 progress?.Report(new(message, done, total));
+                return (Convert.ToHexStringLower(sha512.GetHashAndReset()), Convert.ToHexStringLower(sha256.GetHashAndReset()));
             }
         }
-        progress?.Report(new(message, done, total));
-        return Convert.ToHexStringLower(hash.GetHashAndReset());
     }
 
-    /// <summary>Unpacks with the system <c>tar</c>, which reads both .tar.gz and .tar.xz and keeps links and permissions.</summary>
+    /// <summary>
+    /// Unpacks with the system <c>tar</c>, which reads both .tar.gz and .tar.xz, keeps the build's links and
+    /// permissions, and refuses member names that climb out of the destination.
+    /// </summary>
     private static async Task ExtractAsync(string archive, string destination, CancellationToken cancellationToken)
     {
-        var startInfo = new ProcessStartInfo("tar", ["-xf", archive, "-C", destination])
+        var startInfo = new ProcessStartInfo("tar", ["--no-same-owner", "-xf", archive, "-C", destination])
         {
             UseShellExecute = false,
             RedirectStandardError = true,

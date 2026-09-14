@@ -33,8 +33,8 @@ public sealed partial class AccountServerItemViewModel : ObservableObject
     public Server Server { get; }
     public string Name => Server.Name;
     public string Emulator => Server.Emulator.ToString();
-    public bool HasDiscord => !string.IsNullOrWhiteSpace(Server.DiscordUrl);
-    public bool HasWebsite => !string.IsNullOrWhiteSpace(Server.WebsiteUrl);
+    public bool HasDiscord => SafeLinks.TryGetWebLink(Server.DiscordUrl, out _);
+    public bool HasWebsite => SafeLinks.TryGetWebLink(Server.WebsiteUrl, out _);
 
     public string Detail
     {
@@ -97,12 +97,12 @@ public sealed partial class AccountServerItemViewModel : ObservableObject
     [RelayCommand]
     private void OpenDiscord()
     {
-        if (HasDiscord) Dialogs.OpenExternal(Server.DiscordUrl!);
+        Dialogs.OpenWebLink(Server.DiscordUrl);
     }
 
     [RelayCommand]
     private void OpenWebsite()
     {
-        if (HasWebsite) Dialogs.OpenExternal(Server.WebsiteUrl!);
+        Dialogs.OpenWebLink(Server.WebsiteUrl);
     }
 }

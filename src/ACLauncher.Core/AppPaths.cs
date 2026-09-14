@@ -8,6 +8,12 @@ public static class AppPaths
 {
     private const string AppDirName = "ac-launcher";
 
+    /// <summary>Owner read, write and search only — the launcher's folders hold account names and logs.</summary>
+    public const UnixFileMode PrivateDirectoryMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+
+    /// <summary>Owner read and write only.</summary>
+    public const UnixFileMode PrivateFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+
     static AppPaths() => Configure();
 
     public static string ConfigDir { get; private set; } = "";
@@ -40,6 +46,30 @@ public static class AppPaths
         DataDir = Path.Combine(XdgDir("XDG_DATA_HOME", Path.Combine(home, ".local", "share")), AppDirName);
         CacheDir = Path.Combine(XdgDir("XDG_CACHE_HOME", Path.Combine(home, ".cache")), AppDirName);
         StateDir = Path.Combine(XdgDir("XDG_STATE_HOME", Path.Combine(home, ".local", "state")), AppDirName);
+    }
+
+    /// <summary>
+    /// Creates the launcher's own folders readable by the owner only, and tightens them if an earlier
+    /// version created them with the default (world-readable) mode.
+    /// </summary>
+    public static void EnsurePrivateDirectories()
+    {
+        foreach (var dir in new[] { ConfigDir, DataDir, CacheDir, StateDir, LogDir })
+            CreatePrivateDirectory(dir);
+    }
+
+    public static void CreatePrivateDirectory(string dir)
+    {
+        try
+        {
+            Directory.CreateDirectory(dir, PrivateDirectoryMode);
+            if ((File.GetUnixFileMode(dir) & ~PrivateDirectoryMode) != 0)
+                File.SetUnixFileMode(dir, PrivateDirectoryMode);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine($"ac-launcher: cannot secure {dir}: {e.Message}");
+        }
     }
 
     // The spec says a relative value is invalid and must be ignored.

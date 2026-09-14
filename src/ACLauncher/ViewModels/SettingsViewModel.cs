@@ -105,7 +105,11 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     partial void OnUmuRunPathChanged(string value) => RefreshUmuStatus();
 
-    partial void OnEnvironmentTextChanged(string value) => EnvironmentError = ParseEnvironment(value, out _) ?? "";
+    partial void OnEnvironmentTextChanged(string value) =>
+        EnvironmentError = ParseEnvironment(value, out var environment)
+            ?? (environment.ContainsKey("PROTON_LOG")
+                ? "Note: PROTON_LOG makes Proton write the game's full command line, including the account password, to a log file in your home folder."
+                : "");
 
     /// <summary>
     /// The choices: the two "latest" options, every version the launcher has installed, builds found elsewhere,
@@ -237,7 +241,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     private void OpenPrefixFolder()
     {
         var prefix = string.IsNullOrWhiteSpace(PrefixPath) ? AppPaths.DefaultPrefix : PrefixPath.Trim();
-        if (Directory.Exists(prefix)) Dialogs.OpenExternal(prefix);
+        if (Directory.Exists(prefix)) Dialogs.OpenFolder(prefix);
         else UmuStatus = "The prefix has not been created yet; it is set up on the first launch.";
     }
 

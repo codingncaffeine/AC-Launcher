@@ -59,6 +59,18 @@ Downloads are on the [releases page](https://github.com/codingncaffeine/AC-Launc
 The client stores its own settings in the prefix, under
 `drive_c/users/steamuser/Documents/Asheron's Call/UserPreferences.ini`.
 
+## Security
+
+- **Passwords live in your desktop keyring** (GNOME Keyring, KWallet, KeePassXC) when one is available, and are
+  otherwise kept in `accounts.json`, readable only by you. They are masked in the log.
+- **Every download is verified**: Proton builds against their published checksums (builds that publish none cannot
+  be installed), and umu-launcher against GitHub's SHA-256 digest. Server lists are only fetched over HTTPS.
+- **The launcher's files and folders are private to your user.**
+- **One limit comes from the game itself:** the client takes the password on its command line, so other users on
+  the same computer can see it while the game runs.
+
+Details, and how to report a vulnerability, are in [SECURITY.md](SECURITY.md).
+
 ## Building
 
 Requires the .NET 10 SDK.

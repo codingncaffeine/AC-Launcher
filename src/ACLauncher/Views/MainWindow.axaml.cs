@@ -16,22 +16,23 @@ public partial class MainWindow : Window
 
     private async void OnAddAccount(object? sender, RoutedEventArgs e)
     {
-        var account = await new AccountDialog(null).ShowDialog<Account?>(this);
-        if (account is not null) ViewModel.AddAccount(account);
+        var edit = await new AccountDialog(null, "").ShowDialog<AccountEdit?>(this);
+        if (edit is not null) await ViewModel.AddAccountAsync(edit);
     }
 
     private async void OnEditAccount(object? sender, RoutedEventArgs e)
     {
         if (ViewModel.SelectedAccount is not { } item) return;
-        var edited = await new AccountDialog(item.Account).ShowDialog<Account?>(this);
-        if (edited is not null) ViewModel.AccountEdited();
+        var password = await ViewModel.GetPasswordForEditAsync(item.Account);
+        var edit = await new AccountDialog(item.Account, password).ShowDialog<AccountEdit?>(this);
+        if (edit is not null) await ViewModel.UpdateAccountAsync(item, edit);
     }
 
     private async void OnDeleteAccount(object? sender, RoutedEventArgs e)
     {
         if (ViewModel.SelectedAccount is not { } item) return;
         if (await Dialogs.ConfirmAsync(this, "Delete account", $"Delete {item.DisplayName}? Its saved password is removed too.", "Delete"))
-            ViewModel.DeleteAccount(item);
+            await ViewModel.DeleteAccountAsync(item);
     }
 
     private async void OnServers(object? sender, RoutedEventArgs e)

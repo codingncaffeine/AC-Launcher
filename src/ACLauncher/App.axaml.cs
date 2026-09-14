@@ -16,6 +16,7 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            AppPaths.EnsurePrivateDirectories();
             Log.Open(AppPaths.LogDir);
             Log.Info($"AC Launcher {typeof(App).Assembly.GetName().Version?.ToString(3)} starting (settings in {AppPaths.ConfigDir})");
 

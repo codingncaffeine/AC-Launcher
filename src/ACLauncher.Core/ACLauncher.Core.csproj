@@ -3,6 +3,8 @@
   <PropertyGroup>
     <RootNamespace>ACLauncher.Core</RootNamespace>
     <AssemblyName>ACLauncher.Core</AssemblyName>
+    <!-- Library code never resumes on a captured context, and every disposable is disposed. -->
+    <AnalysisModeReliability>All</AnalysisModeReliability>
   </PropertyGroup>
 
   <ItemGroup>

@@ -119,7 +119,7 @@ public sealed partial class ProtonVersionsViewModel : ObservableObject
         var family = SelectedFamily.Family;
         var installed = ProtonInstaller.ListInstalled().Where(p => p.Family == family).ToList();
         var releases = _releases.Where(r => r.Family == family).ToList();
-        var latestTag = releases.FirstOrDefault(r => !r.Prerelease)?.Tag;
+        var latestTag = releases.FirstOrDefault(r => !r.Prerelease && r.IsVerifiable)?.Tag;
 
         Versions.Clear();
         foreach (var release in releases.Where(r => ShowPrereleases || !r.Prerelease))
@@ -129,7 +129,8 @@ public sealed partial class ProtonVersionsViewModel : ObservableObject
             {
                 Name = release.Tag,
                 Release = release,
-                Detail = $"Released {release.Published.LocalDateTime:yyyy-MM-dd}  ·  {release.ArchiveSize / (1024 * 1024)} MB download",
+                Detail = $"Released {release.Published.LocalDateTime:yyyy-MM-dd}  ·  {release.ArchiveSize / (1024 * 1024)} MB download" +
+                         (release.IsVerifiable ? "" : "  ·  no published checksum, so it cannot be installed"),
                 IsLatest = release.Tag == latestTag,
                 Prerelease = release.Prerelease,
                 Directory = directory,
@@ -262,7 +263,7 @@ public sealed partial class ProtonVersionRow(ProtonVersionsViewModel owner) : Ob
 
     public bool CanRemove => IsInstalled && !External && !IsInUse;
 
-    private bool CanInstall() => Release is not null && !IsInstalled && !owner.IsDownloading;
+    private bool CanInstall() => Release is { IsVerifiable: true } && !IsInstalled && !owner.IsDownloading;
 
     [RelayCommand(CanExecute = nameof(CanInstall))]
     private Task InstallAsync() => owner.InstallAsync(this);

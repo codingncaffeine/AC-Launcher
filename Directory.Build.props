@@ -7,6 +7,13 @@
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <InvariantGlobalization>false</InvariantGlobalization>
+    <!-- Every security rule the .NET analyzers have, as warnings (and so as errors). -->
+    <AnalysisModeSecurity>All</AnalysisModeSecurity>
+    <!-- NuGet dependencies are pinned by a lock file, so a restore can never silently pick up different packages. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
     <Version>0.5.0</Version>
     <Authors>codingncaffeine</Authors>
     <Product>AC Launcher</Product>

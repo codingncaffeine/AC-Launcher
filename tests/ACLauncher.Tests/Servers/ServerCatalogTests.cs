@@ -30,12 +30,13 @@ public sealed class ServerCatalogTests : IDisposable
         // B is offline now but was cached earlier.
         File.WriteAllText(ServerCatalog.CacheFile(_cache, b), List(("Beta", "b.example:9000"), ("alpha", "dup.example:9000")));
 
-        using var http = new HttpClient(new FakeHandler(uri => uri.AbsolutePath switch
+        using var handler = new FakeHandler(uri => uri.AbsolutePath switch
         {
             "/a.xml" => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(List(("Alpha", "a.example:9000"))) },
             "/off.xml" => throw new InvalidOperationException("a disabled list must not be fetched"),
             _ => new HttpResponseMessage(HttpStatusCode.NotFound),
-        }));
+        });
+        using var http = new HttpClient(handler, disposeHandler: false);
 
         var servers = await ServerCatalog.RefreshAsync(http, [a, b, off], _cache, CancellationToken.None);
 
@@ -50,13 +51,26 @@ public sealed class ServerCatalogTests : IDisposable
     {
         var a = new ServerListSource { Name = "A", Url = "https://lists.example/a.xml" };
         File.WriteAllText(ServerCatalog.CacheFile(_cache, a), List(("Kept", "k.example:9000")));
-        using var http = new HttpClient(new FakeHandler(_ =>
-            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("<html>captive portal</html") }));
+        using var handler = new FakeHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("<html>captive portal</html") });
+        using var http = new HttpClient(handler, disposeHandler: false);
 
         var servers = await ServerCatalog.RefreshAsync(http, [a], _cache, CancellationToken.None);
 
         Assert.Equal("Kept", Assert.Single(servers).Name);
         Assert.Contains("Kept", File.ReadAllText(ServerCatalog.CacheFile(_cache, a)));
+    }
+
+    [Fact]
+    public async Task ListsNotServedOverHttpsAreNeverFetchedOrReadFromCache()
+    {
+        var plain = new ServerListSource { Name = "Plain", Url = "http://lists.example/plain.xml" };
+        File.WriteAllText(ServerCatalog.CacheFile(_cache, plain), List(("Planted", "evil.example:9000")));
+        using var handler = new FakeHandler(_ => throw new InvalidOperationException("a plain-HTTP list must not be fetched"));
+        using var http = new HttpClient(handler, disposeHandler: false);
+
+        Assert.Empty(await ServerCatalog.RefreshAsync(http, [plain], _cache, CancellationToken.None));
+        Assert.Empty(ServerCatalog.LoadCached([plain], _cache));
     }
 
     [Fact]

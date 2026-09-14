@@ -27,18 +27,19 @@ smoke_one() {
     tmp=$(mktemp -d) || return 1
     trap 'rm -rf "$tmp"' RETURN
 
+    local unpacked=0
     case $artifact in
         *.tar.gz|*.tgz|*.pkg.tar.zst|*.pkg.tar.xz)
-            bsdtar -xf "$artifact" -C "$tmp" ;;
+            bsdtar -xf "$artifact" -C "$tmp" && unpacked=1 ;;
         *.deb)
             if command -v dpkg-deb >/dev/null; then
-                dpkg-deb -x "$artifact" "$tmp"
+                dpkg-deb -x "$artifact" "$tmp" && unpacked=1
             else
-                bsdtar -xOf "$artifact" 'data.tar.*' | bsdtar -xf - -C "$tmp"
+                bsdtar -xOf "$artifact" 'data.tar.*' | bsdtar -xf - -C "$tmp" && unpacked=1
             fi ;;
         *)  fail "unrecognised artifact type"; return 1 ;;
     esac
-    [[ $? -eq 0 ]] || { fail "could not unpack"; return 1; }
+    (( unpacked )) || { fail "could not unpack"; return 1; }
 
     payload=$(find "$tmp" -name ACLauncher -type f -perm -u+x -printf '%h\n' | head -1)
     [[ -n $payload ]] || { fail "no ACLauncher apphost in the artifact"; return 1; }
@@ -55,14 +56,14 @@ smoke_one() {
     for f in ACLauncher.dll ACLauncher.Core.dll ACLauncher.runtimeconfig.json ACLauncher.deps.json \
              System.Private.CoreLib.dll Avalonia.Base.dll Avalonia.X11.dll \
              libcoreclr.so libhostfxr.so libhostpolicy.so libSkiaSharp.so libHarfBuzzSharp.so; do
-        [[ -f "$payload/$f" ]] && ok "$f" || fail "$f is missing"
+        if [[ -f "$payload/$f" ]]; then ok "$f"; else fail "$f is missing"; fi
     done
 
     local icon desktop
     icon=$(find "$tmp" -path '*hicolor/256x256/apps/ac-launcher.png' | head -1)
     desktop=$(find "$tmp" -name ac-launcher.desktop | head -1)
-    [[ -n $icon ]] && ok "icon ${icon#"$tmp"}" || fail "256px icon is missing"
-    [[ -n $desktop ]] && ok "desktop entry ${desktop#"$tmp"}" || fail "desktop entry is missing"
+    if [[ -n $icon ]]; then ok "icon ${icon#"$tmp"}"; else fail "256px icon is missing"; fi
+    if [[ -n $desktop ]]; then ok "desktop entry ${desktop#"$tmp"}"; else fail "desktop entry is missing"; fi
 
     # --- launch ----------------------------------------------------------------
     if [[ -z ${DISPLAY:-} && -z ${WAYLAND_DISPLAY:-} ]]; then

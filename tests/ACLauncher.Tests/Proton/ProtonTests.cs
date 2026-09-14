@@ -7,6 +7,8 @@ namespace ACLauncher.Tests.Proton;
 
 public sealed class ProtonReleasesTests
 {
+    private const string Digest = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
     private const string Page = """
         [
           {
@@ -16,13 +18,14 @@ public sealed class ProtonReleasesTests
               { "name": "GE-Proton11-6-aarch64.sha512sum", "size": 159, "browser_download_url": "https://dl.example/a.sum" },
               { "name": "GE-Proton11-6-aarch64.tar.gz", "size": 616776749, "browser_download_url": "https://dl.example/a.tgz" },
               { "name": "GE-Proton11-6-x86_64.sha512sum", "size": 158, "browser_download_url": "https://dl.example/x.sum" },
-              { "name": "GE-Proton11-6-x86_64.tar.gz", "size": 533700853, "browser_download_url": "https://dl.example/x.tgz" }
+              { "name": "GE-Proton11-6-x86_64.tar.gz", "size": 533700853, "browser_download_url": "https://dl.example/x.tgz",
+                "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" }
             ]
           },
           {
             "tag_name": "GE-Proton12-0-rc1", "draft": false, "prerelease": true, "published_at": null,
             "created_at": "2026-09-01T00:00:00Z",
-            "assets": [ { "name": "GE-Proton12-0-rc1.tar.gz", "size": 1, "browser_download_url": "https://dl.example/rc.tgz" } ]
+            "assets": [ { "name": "GE-Proton12-0-rc1.tar.gz", "size": 1, "browser_download_url": "https://dl.example/rc.tgz", "digest": "md5:abc" } ]
           },
           { "tag_name": "Draft", "draft": true, "prerelease": false, "published_at": null, "created_at": "2026-09-01T00:00:00Z", "assets": [] },
           { "tag_name": "SourceOnly", "draft": false, "prerelease": false, "published_at": "2026-01-01T00:00:00Z", "created_at": "2026-01-01T00:00:00Z",
@@ -41,7 +44,7 @@ public sealed class ProtonReleasesTests
     [Fact]
     public void KeepsX8664ArchivesAndSkipsDraftsAndSourceOnlyReleases()
     {
-        var releases = ProtonReleasesAccess.Parse(Page, out var count);
+        var releases = ProtonReleases.Parse(Page, ProtonFamily.GEProton, out var count);
 
         Assert.Equal(5, count);
         Assert.Equal(["GE-Proton11-6", "GE-Proton12-0-rc1", "GE-Proton7-54"], releases.Select(r => r.Tag));
@@ -50,14 +53,21 @@ public sealed class ProtonReleasesTests
         Assert.Equal("GE-Proton11-6-x86_64.tar.gz", latest.ArchiveName);
         Assert.Equal("https://dl.example/x.tgz", latest.ArchiveUrl);
         Assert.Equal("https://dl.example/x.sum", latest.ChecksumUrl);
+        Assert.Equal(Digest, latest.ArchiveDigest);
         Assert.Equal(533700853, latest.ArchiveSize);
         Assert.False(latest.Prerelease);
+        Assert.True(latest.IsVerifiable);
 
-        Assert.True(releases[1].Prerelease);
-        Assert.Null(releases[1].ChecksumUrl);
-        Assert.Equal(new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero), releases[1].Published);
+        var rc = releases[1];
+        Assert.True(rc.Prerelease);
+        Assert.Null(rc.ChecksumUrl);
+        Assert.Null(rc.ArchiveDigest); // an unrecognised digest is not trusted
+        Assert.False(rc.IsVerifiable);
+        Assert.Equal(new DateTimeOffset(2026, 9, 1, 0, 0, 0, TimeSpan.Zero), rc.Published);
 
         Assert.Equal("https://dl.example/7.sum", releases[2].ChecksumUrl);
+        Assert.Null(releases[2].ArchiveDigest);
+        Assert.True(releases[2].IsVerifiable);
     }
 
     [Theory]
@@ -74,12 +84,6 @@ public sealed class ProtonReleasesTests
         Assert.Equal(ProtonFamily.UMUProton, ProtonChoiceValue.LatestFamily(ProtonChoiceValue.LatestUMU));
         Assert.Null(ProtonChoiceValue.LatestFamily("/opt/proton"));
     }
-
-    private static class ProtonReleasesAccess
-    {
-        public static List<ProtonRelease> Parse(string json, out int count) =>
-            ProtonReleases.Parse(json, ProtonFamily.GEProton, out count);
-    }
 }
 
 public sealed class ProtonInstallerTests : IDisposable
@@ -90,11 +94,11 @@ public sealed class ProtonInstallerTests : IDisposable
 
     private string Root => Path.Combine(_dir, "root");
 
-    private byte[] MakeArchive(string topFolder)
+    private byte[] MakeArchive(string topFolder, bool withProtonScript = true)
     {
         var source = Path.Combine(_dir, "src");
         Directory.CreateDirectory(Path.Combine(source, topFolder, "files", "bin"));
-        File.WriteAllText(Path.Combine(source, topFolder, "proton"), "#!/usr/bin/env python3\n");
+        if (withProtonScript) File.WriteAllText(Path.Combine(source, topFolder, "proton"), "#!/usr/bin/env python3\n");
         File.WriteAllText(Path.Combine(source, topFolder, "files", "bin", "wine"), "binary");
         File.CreateSymbolicLink(Path.Combine(source, topFolder, "files", "bin", "wine64"), "wine");
         var archive = Path.Combine(_dir, topFolder + ".tar.gz");
@@ -104,9 +108,12 @@ public sealed class ProtonInstallerTests : IDisposable
         return File.ReadAllBytes(archive);
     }
 
-    private static ProtonRelease Release(string tag, bool withChecksum = true) =>
+    private static string Sha512File(byte[] archive, string name) => $"{Convert.ToHexStringLower(SHA512.HashData(archive))}  {name}\n";
+    private static string Sha256Digest(byte[] archive) => "sha256:" + Convert.ToHexStringLower(SHA256.HashData(archive));
+
+    private static ProtonRelease Release(string tag, string? checksumUrl = "https://dl.example/sum", string? digest = null) =>
         new(ProtonFamily.GEProton, tag, DateTimeOffset.UnixEpoch, false, tag + ".tar.gz",
-            "https://dl.example/archive", 0, withChecksum ? "https://dl.example/sum" : null);
+            "https://dl.example/archive", 0, checksumUrl, digest);
 
     private sealed class FakeHandler(byte[] archive, string checksum) : HttpMessageHandler
     {
@@ -126,12 +133,12 @@ public sealed class ProtonInstallerTests : IDisposable
     public async Task InstallsVerifiedArchiveKeepingLinksAndListsIt()
     {
         var archive = MakeArchive("GE-Proton9-1");
-        var sum = $"{Convert.ToHexStringLower(SHA512.HashData(archive))}  GE-Proton9-1.tar.gz\n";
-        var handler = new FakeHandler(archive, sum);
-        using var http = new HttpClient(handler);
+        using var handler = new FakeHandler(archive, Sha512File(archive, "GE-Proton9-1.tar.gz"));
+        using var http = new HttpClient(handler, disposeHandler: false);
         var reports = new List<ProtonInstallProgress>();
 
-        var dir = await ProtonInstaller.InstallAsync(http, Release("GE-Proton9-1"), new SyncProgress(reports), CancellationToken.None, Root);
+        var dir = await ProtonInstaller.InstallAsync(http, Release("GE-Proton9-1", digest: Sha256Digest(archive)),
+            new SyncProgress(reports), CancellationToken.None, Root);
 
         Assert.Equal(Path.Combine(Root, "GE-Proton9-1"), dir);
         Assert.True(File.Exists(Path.Combine(dir, "proton")));
@@ -146,11 +153,24 @@ public sealed class ProtonInstallerTests : IDisposable
     }
 
     [Fact]
-    public async Task RejectsArchiveThatFailsItsChecksumAndLeavesNothing()
+    public async Task VerifiesWithGitHubDigestWhenNoChecksumFileIsPublished()
+    {
+        var archive = MakeArchive("GE-Proton9-4");
+        using var handler = new FakeHandler(archive, "");
+        using var http = new HttpClient(handler, disposeHandler: false);
+
+        var dir = await ProtonInstaller.InstallAsync(http, Release("GE-Proton9-4", checksumUrl: null, digest: Sha256Digest(archive)),
+            null, CancellationToken.None, Root);
+
+        Assert.True(File.Exists(Path.Combine(dir, "proton")));
+    }
+
+    [Fact]
+    public async Task RejectsArchiveThatFailsItsChecksumFileAndLeavesNothing()
     {
         var archive = MakeArchive("GE-Proton9-2");
-        var wrong = new string('a', 128) + "  GE-Proton9-2.tar.gz";
-        using var http = new HttpClient(new FakeHandler(archive, wrong));
+        using var handler = new FakeHandler(archive, new string('a', 128) + "  GE-Proton9-2.tar.gz");
+        using var http = new HttpClient(handler, disposeHandler: false);
 
         var e = await Assert.ThrowsAsync<ProtonDownloadException>(() =>
             ProtonInstaller.InstallAsync(http, Release("GE-Proton9-2"), null, CancellationToken.None, Root));
@@ -160,18 +180,44 @@ public sealed class ProtonInstallerTests : IDisposable
     }
 
     [Fact]
-    public async Task RejectsArchiveWithoutProtonScript()
+    public async Task RejectsArchiveThatFailsTheDigestEvenWhenTheChecksumFileMatches()
     {
-        var source = Path.Combine(_dir, "junk");
-        Directory.CreateDirectory(Path.Combine(source, "stuff"));
-        File.WriteAllText(Path.Combine(source, "stuff", "readme"), "x");
-        var path = Path.Combine(_dir, "junk.tar.gz");
-        using (var tar = Process.Start(new ProcessStartInfo("tar", ["-czf", path, "-C", source, "stuff"]))!)
-            tar.WaitForExit();
-        using var http = new HttpClient(new FakeHandler(File.ReadAllBytes(path), ""));
+        var archive = MakeArchive("GE-Proton9-5");
+        using var handler = new FakeHandler(archive, Sha512File(archive, "GE-Proton9-5.tar.gz"));
+        using var http = new HttpClient(handler, disposeHandler: false);
+        var wrongDigest = "sha256:" + new string('b', 64);
 
         await Assert.ThrowsAsync<ProtonDownloadException>(() =>
-            ProtonInstaller.InstallAsync(http, Release("GE-Proton9-3", withChecksum: false), null, CancellationToken.None, Root));
+            ProtonInstaller.InstallAsync(http, Release("GE-Proton9-5", digest: wrongDigest), null, CancellationToken.None, Root));
+        Assert.Empty(Directory.GetFileSystemEntries(Root));
+    }
+
+    [Fact]
+    public async Task RefusesReleaseWithoutAnyChecksumBeforeDownloading()
+    {
+        using var handler = new FakeHandler([1, 2, 3], "");
+        using var http = new HttpClient(handler, disposeHandler: false);
+
+        var e = await Assert.ThrowsAsync<ProtonDownloadException>(() =>
+            ProtonInstaller.InstallAsync(http, Release("GE-Proton4-1", checksumUrl: null), null, CancellationToken.None, Root));
+
+        Assert.Contains("no checksum", e.Message);
+        Assert.Equal(0, handler.Requests);
+        Assert.False(Directory.Exists(Path.Combine(Root, "GE-Proton4-1")));
+    }
+
+    [Fact]
+    public async Task RejectsVerifiedArchiveWithoutProtonScript()
+    {
+        var archive = MakeArchive("stuff", withProtonScript: false);
+        using var handler = new FakeHandler(archive, "");
+        using var http = new HttpClient(handler, disposeHandler: false);
+
+        var e = await Assert.ThrowsAsync<ProtonDownloadException>(() =>
+            ProtonInstaller.InstallAsync(http, Release("GE-Proton9-3", checksumUrl: null, digest: Sha256Digest(archive)),
+                null, CancellationToken.None, Root));
+
+        Assert.Contains("does not contain a Proton build", e.Message);
         Assert.Empty(Directory.GetFileSystemEntries(Root));
     }
 
@@ -196,9 +242,9 @@ public sealed class ProtonInstallerTests : IDisposable
     }
 
     [Theory]
-    [InlineData("  ", null)]
-    [InlineData("xyz  file", null)]
-    public void RejectsUnreadableChecksums(string text, string? expected) => Assert.Equal(expected, ProtonInstaller.ParseChecksum(text));
+    [InlineData("  ")]
+    [InlineData("xyz  file")]
+    public void RejectsUnreadableChecksums(string text) => Assert.Null(ProtonInstaller.ParseChecksum(text));
 
     [Fact]
     public void ReadsChecksumFile()

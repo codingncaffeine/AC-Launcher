@@ -2,7 +2,12 @@ using System.Diagnostics;
 
 namespace ACLauncher.Core.Launching;
 
-public sealed record LaunchTarget(Account Account, Server Server);
+/// <param name="Password">The account's password, resolved from the keyring or the accounts file.</param>
+public sealed record LaunchTarget(Account Account, Server Server, string Password)
+{
+    // Keep the password out of the record's generated ToString.
+    public override string ToString() => $"LaunchTarget {{ Account = {Account.DisplayName}, Server = {Server.Name} }}";
+}
 
 /// <summary>Everything a launch needs from the launcher's configuration, resolved up front.</summary>
 public sealed record LaunchEnvironment(
@@ -22,7 +27,7 @@ public sealed record LaunchEnvironment(
         var check = GameInstall.Check(directory);
         if (!check.IsValid || check.ClientPath is null) throw new LaunchException(check.Message);
         clientPath = check.ClientPath;
-        clientArguments = ClientArguments.Build(target.Server, target.Account);
+        clientArguments = ClientArguments.Build(target.Server, target.Account, target.Password);
 
         // The client finds its .dat files relative to the working directory.
         return BuildUmuStartInfo(clientPath, clientArguments, Path.GetDirectoryName(clientPath)!);
@@ -108,13 +113,15 @@ public sealed class GameManager
 
         var name = target.Account.DisplayName;
         Log.Info($"Launching {name} on {target.Server.Name}: {environment.UmuRunPath} \"{clientPath}\" " +
-                 $"{ClientArguments.Redact(arguments, target.Account.Password)} " +
+                 $"{ClientArguments.Redact(arguments, target.Password)} " +
                  $"(WINEPREFIX={environment.PrefixPath}, PROTONPATH={(string.IsNullOrWhiteSpace(environment.ProtonPath) ? "<umu default>" : environment.ProtonPath)})");
 
         var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
         var session = new GameSession(target, process);
-        process.OutputDataReceived += (_, e) => { if (!string.IsNullOrEmpty(e.Data)) Log.Info($"[{name}] {e.Data}"); };
-        process.ErrorDataReceived += (_, e) => { if (!string.IsNullOrEmpty(e.Data)) Log.Info($"[{name}] {e.Data}"); };
+        // umu, Proton and Wine can echo the command line; the password never reaches the log.
+        var password = target.Password;
+        process.OutputDataReceived += (_, e) => { if (!string.IsNullOrEmpty(e.Data)) Log.Info($"[{name}] {ClientArguments.RedactLine(e.Data, password)}"); };
+        process.ErrorDataReceived += (_, e) => { if (!string.IsNullOrEmpty(e.Data)) Log.Info($"[{name}] {ClientArguments.RedactLine(e.Data, password)}"); };
         process.Exited += (_, _) => OnExited(session, process);
 
         lock (_gate) _sessions.Add(session);
