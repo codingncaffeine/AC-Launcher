@@ -1,0 +1,7 @@
+# The launcher ships the self-contained .NET runtime and SkiaSharp exactly as their upstream projects
+# build them. Those binaries link these libraries statically; the copies cannot be swapped for the
+# system's without rebuilding the runtime and SkiaSharp.
+ac-launcher: embedded-library freetype [usr/lib/ac-launcher/libSkiaSharp.so]
+ac-launcher: embedded-library libjpeg [usr/lib/ac-launcher/libSkiaSharp.so]
+ac-launcher: embedded-library libpng [usr/lib/ac-launcher/libSkiaSharp.so]
+ac-launcher: embedded-library zlib [usr/lib/ac-launcher/libSystem.IO.Compression.Native.so]

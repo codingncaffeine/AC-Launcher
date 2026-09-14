@@ -118,6 +118,19 @@ done
 [[ -f $root/usr/share/applications/ac-launcher.desktop ]] && ok "desktop entry installed" || fail "desktop entry missing"
 [[ -f $root/usr/share/icons/hicolor/256x256/apps/ac-launcher.png ]] && ok "icon installed" || fail "icon missing"
 
+# --- lintian: Debian's own package checks ----------------------------------------
+if in_root apt-get -y -qq install --no-install-recommends lintian >> "$work/apt.log" 2>&1; then
+    in_root lintian --no-tag-display-limit /tmp/pkg.deb > "$work/lintian.log" 2>&1
+    errors=$(grep -c '^E:' "$work/lintian.log" || true)
+    warnings=$(grep -c '^W:' "$work/lintian.log" || true)
+    if (( errors == 0 )); then ok "lintian: 0 errors, $warnings warnings"; else fail "lintian: $errors errors, $warnings warnings"; fi
+    # Every error in full; warnings and overridden tags counted by tag so no kind of finding is cut off.
+    grep '^E:' "$work/lintian.log" | sed 's/^/           | /'
+    grep -E '^(W|O):' "$work/lintian.log" | awk '{ print $1, $3 }' | sort | uniq -c | sort -rn | sed 's/^/           | /'
+else
+    fail "could not install lintian in the root"
+fi
+
 # --- launch inside the root ---------------------------------------------------
 if [[ -z ${DISPLAY:-} ]]; then
     printf '  \033[33mSKIPPED\033[0m  launch: no DISPLAY\n'

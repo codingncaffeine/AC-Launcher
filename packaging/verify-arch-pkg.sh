@@ -12,14 +12,15 @@
 # Usage: packaging/verify-arch-pkg.sh <package.pkg.tar.zst> <archlinux-bootstrap-x86_64.tar.zst>
 set -uo pipefail
 
-(( $# == 2 )) || { echo "usage: $(basename "$0") <package.pkg.tar.zst> <archlinux-bootstrap.tar.zst>" >&2; exit 2; }
+(( $# == 2 || $# == 3 )) || { echo "usage: $(basename "$0") <package.pkg.tar.zst> <archlinux-bootstrap.tar.zst> [PKGBUILD]" >&2; exit 2; }
 PKG=$(realpath "$1")
 BOOTSTRAP=$(realpath "$2")
+PKGBUILD_FILE=$([[ $# == 3 ]] && realpath "$3" || echo "")
 WORK=$(mktemp -d)
 
-unshare --map-auto --map-root-user --mount --pid --fork bash -s "$WORK" "$BOOTSTRAP" "$PKG" <<'INNER'
+unshare --map-auto --map-root-user --mount --pid --fork bash -s "$WORK" "$BOOTSTRAP" "$PKG" "$PKGBUILD_FILE" <<'INNER'
 set -uo pipefail
-work=$1 bootstrap=$2 pkg=$3
+work=$1 bootstrap=$2 pkg=$3 pkgbuild=$4
 failed=0
 fail() { printf '  \033[31mFAIL\033[0m  %s\n' "$*"; failed=1; }
 ok()   { printf '  \033[32mok\033[0m    %s\n' "$*"; }
@@ -100,6 +101,24 @@ done
 [[ -f $root/usr/share/applications/ac-launcher.desktop ]] && ok "desktop entry installed" || fail "desktop entry missing"
 [[ -f $root/usr/share/icons/hicolor/256x256/apps/ac-launcher.png ]] && ok "icon installed" || fail "icon missing"
 [[ -f $root/usr/share/licenses/ac-launcher-bin/LICENSE ]] && ok "license installed" || fail "license missing"
+
+# --- namcap: Arch's own package checks --------------------------------------------
+if in_root pacman -S --noconfirm --needed namcap >> "$work/pacman.log" 2>&1; then
+    targets=("$pkgfile")
+    if [[ -n $pkgbuild ]]; then
+        mkdir -p "$root/tmp/pkgbuild" && cp "$pkgbuild" "$root/tmp/pkgbuild/PKGBUILD"
+        targets=(/tmp/pkgbuild/PKGBUILD "${targets[@]}")
+    fi
+    for target in "${targets[@]}"; do
+        in_root namcap -i "$target" > "$work/namcap.log" 2>&1
+        errors=$(grep -c ' E: ' "$work/namcap.log" || true)
+        warnings=$(grep -c ' W: ' "$work/namcap.log" || true)
+        if (( errors == 0 )); then ok "namcap $(basename "$target"): 0 errors, $warnings warnings"; else fail "namcap $(basename "$target"): $errors errors"; fi
+        grep -E ' (E|W): ' "$work/namcap.log" | sed 's/^/           | /' | head -40
+    done
+else
+    fail "could not install namcap in the root"
+fi
 
 if [[ -z ${DISPLAY:-} ]]; then
     printf '  \033[33mSKIPPED\033[0m  launch: no DISPLAY\n'

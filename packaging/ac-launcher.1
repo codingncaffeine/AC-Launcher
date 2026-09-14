@@ -1,0 +1,45 @@
+.TH AC-LAUNCHER 1 "@DATE@" "AC Launcher @VERSION@" "User Commands"
+.SH NAME
+ac-launcher \- launcher for Asheron's Call emulator servers
+.SH SYNOPSIS
+.B ac-launcher
+.SH DESCRIPTION
+.B ac-launcher
+keeps accounts and servers in one place and starts one or many Asheron's Call game clients at once.
+The Windows game client runs through
+.BR umu-run (1)
+and Proton, without Steam.
+Proton versions (GE-Proton and UMU-Proton) are downloaded, verified against their published checksums,
+and kept in the launcher's own folder.
+.PP
+Account passwords are kept in the desktop keyring through
+.BR secret-tool (1)
+when a Secret Service keyring is available, and otherwise in the accounts file, readable only by the user.
+.SH ENVIRONMENT
+.TP
+.B AC_LAUNCHER_HOME
+Keep every file under this one directory instead of the XDG locations below.
+.TP
+.BR XDG_CONFIG_HOME ", " XDG_DATA_HOME ", " XDG_CACHE_HOME ", " XDG_STATE_HOME
+Base directories for the files listed below.
+.SH FILES
+.TP
+.I ~/.config/ac-launcher/
+Settings, accounts and user-added servers.
+.TP
+.I ~/.local/share/ac-launcher/
+The Wine prefix, installed Proton versions, and the launcher's copy of umu-launcher.
+.TP
+.I ~/.cache/ac-launcher/
+Cached server lists and Proton release data.
+.TP
+.I ~/.local/state/ac-launcher/logs/
+The log.
+.SH SECURITY
+The game client takes the account password on its command line, so other users on the same computer can read it
+from the process list while the game runs.
+.SH SEE ALSO
+.BR umu-run (1),
+.BR secret-tool (1)
+.PP
+https://github.com/codingncaffeine/AC-Launcher

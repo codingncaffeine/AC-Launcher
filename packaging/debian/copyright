@@ -1,0 +1,77 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: AC Launcher
+Upstream-Contact: https://github.com/codingncaffeine/AC-Launcher/issues
+Source: https://github.com/codingncaffeine/AC-Launcher
+
+Files: *
+Copyright: 2026 codingncaffeine
+License: GPL-3.0-only
+
+Files: usr/lib/ac-launcher/System.* usr/lib/ac-launcher/Microsoft.* usr/lib/ac-launcher/mscorlib.dll
+ usr/lib/ac-launcher/netstandard.dll usr/lib/ac-launcher/WindowsBase.dll usr/lib/ac-launcher/libSystem.*
+ usr/lib/ac-launcher/libclr* usr/lib/ac-launcher/libcoreclr.so usr/lib/ac-launcher/libhostfxr.so
+ usr/lib/ac-launcher/libhostpolicy.so usr/lib/ac-launcher/libmscordaccore.so usr/lib/ac-launcher/libmscordbi.so
+ usr/lib/ac-launcher/createdump usr/lib/ac-launcher/ACLauncher
+Copyright: .NET Foundation and Contributors
+License: MIT
+Comment: The .NET runtime. libSystem.IO.Compression.Native.so contains zlib-ng (Zlib license).
+
+Files: usr/lib/ac-launcher/Avalonia.*
+Copyright: The Avalonia Project, AvaloniaUI OÜ
+License: MIT
+Comment: Avalonia.Fonts.Inter.dll embeds the Inter typeface, licensed under the SIL Open Font License 1.1.
+
+Files: usr/lib/ac-launcher/SkiaSharp.dll usr/lib/ac-launcher/libSkiaSharp.so
+Copyright: Microsoft Corporation
+License: MIT
+Comment: libSkiaSharp.so contains Skia (BSD-3-Clause, Google LLC), FreeType (FreeType License),
+ libpng (libpng License) and libjpeg-turbo (IJG and BSD-3-Clause).
+
+Files: usr/lib/ac-launcher/HarfBuzzSharp.dll usr/lib/ac-launcher/libHarfBuzzSharp.so
+Copyright: Microsoft Corporation
+License: MIT
+Comment: libHarfBuzzSharp.so contains HarfBuzz (MIT).
+
+Files: usr/lib/ac-launcher/CommunityToolkit.Mvvm.dll
+Copyright: .NET Foundation and Contributors
+License: MIT
+
+Files: usr/lib/ac-launcher/MicroCom.Runtime.dll
+Copyright: MicroCom contributors
+License: MIT
+
+Files: usr/lib/ac-launcher/Tmds.DBus.Protocol.dll
+Copyright: Tom Deseyn
+License: MIT
+
+License: GPL-3.0-only
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, version 3.
+ .
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ .
+ On Debian systems, the complete text of the GNU General Public License
+ version 3 can be found in "/usr/share/common-licenses/GPL-3".
+
+License: MIT
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ .
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
