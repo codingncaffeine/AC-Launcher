@@ -28,6 +28,9 @@ public static class AppPaths
     public static string ServerListCacheDir => Path.Combine(CacheDir, "server-lists");
     public static string DefaultPrefix => Path.Combine(DataDir, "prefix");
 
+    /// <summary>Copies of the prefix for clients running at the same time (see <c>ClientPrefixes</c>).</summary>
+    public static string ClientPrefixesDir => Path.Combine(DataDir, "client-prefixes");
+
     public static void Configure(string? rootOverride = null)
     {
         var root = rootOverride ?? Environment.GetEnvironmentVariable("AC_LAUNCHER_HOME");

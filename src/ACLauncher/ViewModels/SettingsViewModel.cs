@@ -36,6 +36,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     public LauncherState State { get; }
     public string DefaultPrefix => AppPaths.DefaultPrefix;
+    public string ClientPrefixesDir => AppPaths.ClientPrefixesDir;
     public ObservableCollection<ProtonChoice> ProtonChoices { get; } = [];
 
     [ObservableProperty]

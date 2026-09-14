@@ -15,6 +15,10 @@ which runs Proton without Steam, so no Steam install is needed.
 - **Accounts** — save any number of accounts and tick the servers each one should launch on.
 - **Multi-launch** — press Launch (or F5) to start every ticked account on every ticked server, one after another
   with a configurable pause; each running client can be stopped on its own.
+- **Several clients at once** — the game allows only one client per Windows machine, which under Wine means one per
+  prefix, so each extra client running at the same time gets its own copy of the prefix. A copy is made once and
+  reused; on btrfs or XFS it shares its data with the original. Settings and key maps changed in the first client
+  carry over to the copies.
 - **Server lists** — the community-published server lists are downloaded and cached, so the launcher still works
   offline. Add your own servers, copy a published one to customise it, or hide the ones you never use.
 - **Server status** — each server is checked in the background and shown as up or down, with its response time.
@@ -55,6 +59,7 @@ Downloads are on the [releases page](https://github.com/codingncaffeine/AC-Launc
 | --- | --- |
 | Settings, accounts, your servers | `~/.config/ac-launcher/` (`accounts.json` is readable only by you) |
 | Wine prefix, Proton versions, umu copy | `~/.local/share/ac-launcher/` |
+| Prefix copies for clients running at the same time | `~/.local/share/ac-launcher/client-prefixes/` |
 | Cached server lists | `~/.cache/ac-launcher/` |
 | Log | `~/.local/state/ac-launcher/logs/` |
 

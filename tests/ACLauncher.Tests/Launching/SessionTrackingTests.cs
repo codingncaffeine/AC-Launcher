@@ -10,12 +10,12 @@ namespace ACLauncher.Tests.Launching;
 /// </summary>
 public sealed class SessionTrackingTests : IDisposable
 {
-    // Stand-in for umu-run: starts a child whose program is the game client, then lingers the way the launch
-    // hosting a prefix's wineserver outlives its own client.
+    // Stand-in for umu-run: starts a child whose program is the game client a moment later (the real client takes
+    // seconds to appear), then lingers the way the launch hosting a prefix's wineserver outlives its own client.
     private const string FakeUmu = """
         #!/bin/bash
         if [ -z "$FAKE_NO_CLIENT" ]; then
-            ( exec -a "/games/acclient.exe" sleep "$FAKE_CLIENT_SECONDS" ) &
+            ( sleep 1; exec -a "/games/acclient.exe" sleep "$FAKE_CLIENT_SECONDS" ) &
         fi
         sleep "$FAKE_HOST_SECONDS"
         """;
@@ -41,8 +41,40 @@ public sealed class SessionTrackingTests : IDisposable
         return new LaunchEnvironment(umu, Path.Combine(_dir, "prefix"), "GE-Proton", game, variables);
     }
 
-    private static LaunchTarget Target() =>
-        new(new Account { Username = "player" }, new Server { Name = "Test", Address = "h.example:9000" }, "pw");
+    private static LaunchTarget Target(string user = "player") =>
+        new(new Account { Username = user }, new Server { Name = "Test", Address = "h.example:9000" }, "pw");
+
+    [Fact]
+    public async Task ClientsRunningAtTheSameTimeEachGetTheirOwnPrefixAndAFreedOneIsReused()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var environment = Environment(new() { ["FAKE_CLIENT_SECONDS"] = "30", ["FAKE_HOST_SECONDS"] = "30" });
+        Directory.CreateDirectory(environment.PrefixPath);
+        File.WriteAllText(Path.Combine(environment.PrefixPath, "system.reg"), "");
+        var prefixes = new ClientPrefixes(environment.PrefixPath, Path.Combine(_dir, "copies"));
+        var (manager, ended) = Manager();
+        async Task<LaunchEnvironment> EnvironmentFor(LaunchTarget target, CancellationToken ct) =>
+            environment with { PrefixPath = await prefixes.AcquireAsync(manager.PrefixesInUse(), null, ct) };
+
+        var started = await manager.LaunchAllAsync(EnvironmentFor, [Target("first"), Target("second")], TimeSpan.Zero, null, token);
+        var sessions = manager.Sessions;
+        foreach (var session in sessions) _launches.Add(session.ProcessId);
+
+        Assert.Equal(2, started);
+        Assert.Equal([prefixes.PathFor(1), prefixes.PathFor(2)], sessions.Select(s => s.PrefixPath));
+        var client = await WaitForClient(sessions[0]);
+        await WaitForClient(sessions[1]);
+        // Other clients on this machine may show up too; both of ours must, found through their own processes.
+        Assert.True(ProcessTree.PrefixesRunning(GameInstall.ClientFileName).IsSupersetOf([prefixes.PathFor(1), prefixes.PathFor(2)]));
+
+        sessions[0].Stop();
+        await ended.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (ProcessTree.IsAlive(client) && DateTime.UtcNow < deadline) await Task.Delay(50, token);
+
+        Assert.Equal(prefixes.PathFor(1), await prefixes.AcquireAsync(manager.PrefixesInUse(), null, token));
+        Assert.Equal(prefixes.PathFor(3), await prefixes.AcquireAsync(new HashSet<string>([prefixes.PathFor(1), prefixes.PathFor(2)]), null, token));
+    }
 
     private (GameManager Manager, TaskCompletionSource<GameSession> Ended) Manager()
     {

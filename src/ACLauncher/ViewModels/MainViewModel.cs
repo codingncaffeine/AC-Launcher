@@ -261,14 +261,22 @@ public sealed partial class MainViewModel : ObservableObject
                 }
             }
 
-            if (State.Settings.ForceWindowed)
+            // The client allows one copy of itself per prefix, so each client running at the same time gets its own.
+            var prefixes = new ClientPrefixes(environment.PrefixPath, AppPaths.ClientPrefixesDir);
+            async Task<LaunchEnvironment> EnvironmentFor(LaunchTarget target, CancellationToken ct)
             {
-                var ini = ClientPreferences.PathFor(environment.PrefixPath);
-                if (ClientPreferences.EnsureWindowed(ini)) Log.Info($"Set FullScreen=False in {ini}");
+                var inUse = await Task.Run(State.Games.PrefixesInUse, ct);
+                var prefix = await prefixes.AcquireAsync(inUse, progress, ct);
+                if (State.Settings.ForceWindowed)
+                {
+                    var ini = ClientPreferences.PathFor(prefix);
+                    if (ClientPreferences.EnsureWindowed(ini)) Log.Info($"Set FullScreen=False in {ini}");
+                }
+                return environment with { PrefixPath = prefix };
             }
 
             var delay = TimeSpan.FromSeconds(Math.Max(0, State.Settings.LaunchDelaySeconds));
-            var started = await State.Games.LaunchAllAsync(environment, targets, delay, progress, token);
+            var started = await State.Games.LaunchAllAsync(EnvironmentFor, targets, delay, progress, token);
             if (started > 0) StatusText = started == 1 ? "Started 1 client" : $"Started {started} clients";
         }
         catch (OperationCanceledException)

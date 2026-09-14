@@ -57,6 +57,8 @@
           <Button Grid.Column="2" Content="Default" Click="OnDefaultPrefix" Margin="6,0,0,0" />
         </Grid>
         <TextBlock Classes="dim" TextWrapping="Wrap" Text="{Binding DefaultPrefix, StringFormat='Empty uses {0}'}" />
+        <TextBlock Classes="dim" TextWrapping="Wrap"
+                   Text="{Binding ClientPrefixesDir, StringFormat='The game allows one client per prefix, so each extra client running at the same time uses its own copy of this prefix, made once in {0}'}" />
         <StackPanel Orientation="Horizontal" Spacing="6">
           <Button Content="Open prefix folder" Command="{Binding OpenPrefixFolderCommand}" />
           <Button Content="Wine configuration" Command="{Binding RunWinecfgCommand}" />

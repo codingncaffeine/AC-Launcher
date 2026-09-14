@@ -38,8 +38,7 @@ public sealed record LaunchEnvironment(
         BuildUmuStartInfo(program, arguments, Directory.Exists(PrefixPath) ? PrefixPath : Path.GetTempPath(), launchesClient: false);
 
     /// <summary>Proton has finished creating the prefix once its registry exists.</summary>
-    public bool IsPrefixInitialized =>
-        File.Exists(Path.Combine(PrefixPath, "system.reg")) || File.Exists(Path.Combine(PrefixPath, "pfx", "system.reg"));
+    public bool IsPrefixInitialized => ClientPrefixes.IsInitialized(PrefixPath);
 
     private ProcessStartInfo BuildUmuStartInfo(string program, IReadOnlyList<string> arguments, string workingDirectory, bool launchesClient)
     {
@@ -60,7 +59,7 @@ public sealed record LaunchEnvironment(
         if (string.IsNullOrWhiteSpace(ProtonPath)) startInfo.Environment.Remove("PROTONPATH");
         else startInfo.Environment["PROTONPATH"] = ProtonPath;
         // umu's default verb, waitforexitandrun, waits for every program already running in the prefix to exit, so a
-        // second client would sit queued behind the first. "run" starts it at once, sharing the prefix's wineserver.
+        // client would sit queued behind anything else in its prefix. "run" starts it at once.
         if (launchesClient && !ExtraEnvironment.ContainsKey("PROTON_VERB"))
             startInfo.Environment["PROTON_VERB"] = "run";
         return startInfo;
@@ -72,21 +71,25 @@ public sealed class GameSession
 {
     private int _ended;
 
-    internal GameSession(LaunchTarget target, string clientFileName)
+    internal GameSession(LaunchTarget target, string clientFileName, string prefixPath)
     {
         Target = target;
         ClientFileName = clientFileName;
+        PrefixPath = prefixPath;
     }
 
     public LaunchTarget Target { get; }
     public DateTime StartedUtc { get; internal set; }
+
+    /// <summary>The Wine prefix the client runs in, normalized.</summary>
+    public string PrefixPath { get; }
 
     /// <summary>The <c>umu-run</c> process that launched the client.</summary>
     public int ProcessId { get; internal set; }
 
     /// <summary>
     /// The game client's own process, once it has started. The session follows this process: the launch that
-    /// started a prefix's shared wineserver keeps running until every client in the prefix has exited.
+    /// started a prefix's wineserver keeps running until every program in the prefix has exited.
     /// </summary>
     public int? ClientProcessId { get; internal set; }
 
@@ -98,7 +101,7 @@ public sealed class GameSession
     /// <summary>True for the one caller that ends the session.</summary>
     internal bool TryMarkEnded() => Interlocked.Exchange(ref _ended, 1) == 0;
 
-    /// <summary>Stops this client only — never the other clients sharing the prefix, or their wineserver.</summary>
+    /// <summary>Stops this client only — never other programs in the prefix, or its wineserver.</summary>
     public void Stop()
     {
         if (ClientProcessId is { } client && ProcessTree.IsAlive(client))
@@ -132,6 +135,20 @@ public sealed class GameManager
         lock (_gate) return _sessions.Any(s => s.Target.Account.Id == accountId && s.Target.Server.Id == serverId);
     }
 
+    /// <summary>
+    /// The prefixes a client is running in: this launcher's sessions, including ones still starting, and any game
+    /// client found running on the system (for example one started before the launcher was).
+    /// </summary>
+    public IReadOnlySet<string> PrefixesInUse()
+    {
+        var prefixes = new HashSet<string>(ProcessTree.PrefixesRunning(GameInstall.ClientFileName), StringComparer.Ordinal);
+        lock (_gate)
+        {
+            foreach (var session in _sessions) prefixes.Add(session.PrefixPath);
+        }
+        return prefixes;
+    }
+
     /// <exception cref="LaunchException">The launch could not be started.</exception>
     public GameSession Start(LaunchEnvironment environment, LaunchTarget target)
     {
@@ -144,7 +161,7 @@ public sealed class GameManager
                  $"(WINEPREFIX={environment.PrefixPath}, PROTONPATH={(string.IsNullOrWhiteSpace(environment.ProtonPath) ? "<umu default>" : environment.ProtonPath)})");
 
         var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
-        var session = new GameSession(target, Path.GetFileName(clientPath));
+        var session = new GameSession(target, Path.GetFileName(clientPath), ClientPrefixes.Normalize(environment.PrefixPath));
         // umu, Proton and Wine can echo the command line; the password never reaches the log.
         var password = target.Password;
         process.OutputDataReceived += (_, e) => { if (!string.IsNullOrEmpty(e.Data)) Log.Info($"[{name}] {ClientArguments.RedactLine(e.Data, password)}"); };
@@ -206,14 +223,25 @@ public sealed class GameManager
         SessionEnded?.Invoke(session);
     }
 
+    /// <summary>Starts every target in one environment; see the overload that picks an environment per target.</summary>
+    public Task<int> LaunchAllAsync(LaunchEnvironment environment, IReadOnlyList<LaunchTarget> targets, TimeSpan delay,
+        IProgress<string>? progress, CancellationToken cancellationToken) =>
+        LaunchAllAsync((_, _) => Task.FromResult(environment), targets, delay, progress, cancellationToken);
+
     /// <summary>
     /// Starts each target in order with a pause between them, skipping ones already running.
     /// A target that fails is logged and the rest still launch.
     /// </summary>
+    /// <param name="environmentFor">
+    /// The environment a target launches in, above all its prefix. Called just before that target starts, so it
+    /// sees every client started before it.
+    /// </param>
     /// <returns>The number of clients started.</returns>
-    public async Task<int> LaunchAllAsync(LaunchEnvironment environment, IReadOnlyList<LaunchTarget> targets, TimeSpan delay,
-        IProgress<string>? progress, CancellationToken cancellationToken)
+    public async Task<int> LaunchAllAsync(Func<LaunchTarget, CancellationToken, Task<LaunchEnvironment>> environmentFor,
+        IReadOnlyList<LaunchTarget> targets, TimeSpan delay, IProgress<string>? progress, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(environmentFor);
+        ArgumentNullException.ThrowIfNull(targets);
         var started = 0;
         for (var i = 0; i < targets.Count; i++)
         {
@@ -225,9 +253,10 @@ public sealed class GameManager
                 progress?.Report($"{label} is already running");
                 continue;
             }
-            progress?.Report($"Launching {label} ({i + 1}/{targets.Count})");
             try
             {
+                var environment = await environmentFor(target, cancellationToken).ConfigureAwait(false);
+                progress?.Report($"Launching {label} ({i + 1}/{targets.Count})");
                 Start(environment, target);
                 started++;
             }

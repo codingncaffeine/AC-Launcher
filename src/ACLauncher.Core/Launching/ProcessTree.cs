@@ -115,6 +115,47 @@ public static class ProcessTree
         return null;
     }
 
+    /// <summary>
+    /// The Wine prefixes that have a running process with this program file name, including clients started before
+    /// the launcher was. umu hands the prefix to Proton as <c>STEAM_COMPAT_DATA_PATH</c>, and Wine then sees
+    /// <c>WINEPREFIX=&lt;prefix&gt;/pfx/</c>. Only those two variables are taken from a matching process.
+    /// </summary>
+    public static IReadOnlySet<string> PrefixesRunning(string fileName)
+    {
+        var prefixes = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var dir in SafeEnumerate("/proc"))
+        {
+            if (!int.TryParse(Path.GetFileName(dir), NumberStyles.None, CultureInfo.InvariantCulture, out var pid)) continue;
+            if (ProgramFileName(ReadProgram(pid)) is not { } name || !string.Equals(name, fileName, StringComparison.OrdinalIgnoreCase)) continue;
+            try
+            {
+                if (PrefixFromEnvironment(File.ReadAllBytes($"/proc/{pid}/environ")) is { } prefix) prefixes.Add(prefix);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                // Exited, or not ours to read.
+            }
+        }
+        return prefixes;
+    }
+
+    /// <summary>The prefix named in a <c>/proc/&lt;pid&gt;/environ</c> block, normalized.</summary>
+    internal static string? PrefixFromEnvironment(byte[] environ)
+    {
+        const string Compat = "STEAM_COMPAT_DATA_PATH=";
+        const string Wine = "WINEPREFIX=";
+        string? compat = null, wine = null;
+        foreach (var entry in Encoding.UTF8.GetString(environ).Split('\0'))
+        {
+            if (entry.StartsWith(Compat, StringComparison.Ordinal)) compat = entry[Compat.Length..];
+            else if (entry.StartsWith(Wine, StringComparison.Ordinal)) wine = entry[Wine.Length..];
+        }
+        if (!string.IsNullOrEmpty(compat)) return ClientPrefixes.Normalize(compat);
+        if (string.IsNullOrEmpty(wine)) return null;
+        var path = ClientPrefixes.Normalize(wine);
+        return Path.GetFileName(path) == "pfx" ? Path.GetDirectoryName(path) : path;
+    }
+
     /// <summary>Kills one process and nothing else.</summary>
     public static void KillProcess(int pid)
     {
