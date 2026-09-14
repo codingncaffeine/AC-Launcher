@@ -1,0 +1,82 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ACLauncher.ViewModels"
+        x:Class="ACLauncher.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Classes="launcher"
+        Title="Settings"
+        Width="760" Height="720" MinWidth="560" MinHeight="480"
+        WindowStartupLocation="CenterOwner">
+  <DockPanel Margin="16">
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,12,0,0">
+      <Button Classes="accent" Content="Save" Click="OnSave" MinWidth="80" HorizontalContentAlignment="Center" />
+      <Button Content="Cancel" Click="OnCancel" IsCancel="True" MinWidth="80" HorizontalContentAlignment="Center" />
+    </StackPanel>
+
+    <ScrollViewer>
+      <StackPanel Spacing="6" Margin="0,0,12,0">
+
+        <TextBlock Classes="title" Text="Game" FontSize="17" />
+        <TextBlock Classes="label" Text="Asheron's Call folder" />
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBox Text="{Binding GameDirectory}" />
+          <Button Grid.Column="1" Content="Browse…" Click="OnBrowseGame" Margin="6,0,0,0" />
+        </Grid>
+        <TextBlock Classes="hint" Classes.error="{Binding !GameFolderValid}" Text="{Binding GameFolderMessage}" TextWrapping="Wrap" />
+        <CheckBox Content="Start the game in a window (avoids the fullscreen DirectX error)" IsChecked="{Binding ForceWindowed}" />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Classes="label" Text="Seconds between clients when launching several" VerticalAlignment="Center" />
+          <NumericUpDown Value="{Binding LaunchDelaySeconds}" Minimum="0" Maximum="600" Increment="1" FormatString="0" Width="130" />
+        </StackPanel>
+        <CheckBox Content="Check whether servers are up" IsChecked="{Binding CheckServerStatus}" />
+
+        <TextBlock Classes="title" Text="Proton" FontSize="17" Margin="0,14,0,0" />
+        <TextBlock Classes="dim" TextWrapping="Wrap"
+                   Text="The game runs through umu-launcher, which runs Proton without Steam. Proton versions are downloaded into the launcher's own folder; the first launch also downloads the Steam Linux Runtime once." />
+        <TextBlock Classes="label" Text="Proton version" />
+        <Grid ColumnDefinitions="*,Auto">
+          <ComboBox ItemsSource="{Binding ProtonChoices}" SelectedItem="{Binding SelectedProtonChoice}" HorizontalAlignment="Stretch">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:ProtonChoice">
+                <TextBlock Text="{Binding Label}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <Button Grid.Column="1" Content="Manage versions…" Click="OnManageProton" Margin="6,0,0,0" />
+        </Grid>
+        <TextBlock Classes="dim" Text="Or a folder holding any Proton build:" />
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBox Text="{Binding ProtonPath}" />
+          <Button Grid.Column="1" Content="Browse…" Click="OnBrowseProton" Margin="6,0,0,0" />
+        </Grid>
+
+        <TextBlock Classes="label" Text="Wine prefix" Margin="0,6,0,0" />
+        <Grid ColumnDefinitions="*,Auto,Auto">
+          <TextBox Text="{Binding PrefixPath}" />
+          <Button Grid.Column="1" Content="Browse…" Click="OnBrowsePrefix" Margin="6,0,0,0" />
+          <Button Grid.Column="2" Content="Default" Click="OnDefaultPrefix" Margin="6,0,0,0" />
+        </Grid>
+        <TextBlock Classes="dim" TextWrapping="Wrap" Text="{Binding DefaultPrefix, StringFormat='Empty uses {0}'}" />
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <Button Content="Open prefix folder" Command="{Binding OpenPrefixFolderCommand}" />
+          <Button Content="Wine configuration" Command="{Binding RunWinecfgCommand}" />
+        </StackPanel>
+
+        <TextBlock Classes="label" Text="umu-launcher" Margin="0,6,0,0" />
+        <TextBlock Text="{Binding UmuStatus}" TextWrapping="Wrap" />
+        <TextBlock Classes="dim" Text="umu-run to use (empty finds it automatically):" />
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBox Text="{Binding UmuRunPath}" />
+          <Button Grid.Column="1" Content="Install now" Command="{Binding InstallUmuCommand}" Margin="6,0,0,0"
+                  ToolTip.Tip="Download umu-launcher's self-contained release into the launcher's data folder" />
+        </Grid>
+
+        <TextBlock Classes="title" Text="Environment" FontSize="17" Margin="0,14,0,0" />
+        <TextBlock Classes="dim" TextWrapping="Wrap"
+                   Text="Extra environment variables for the game, one NAME=value per line (for example PROTON_USE_WINED3D=1 or DXVK_HUD=fps)." />
+        <TextBox Text="{Binding EnvironmentText}" AcceptsReturn="True" MinHeight="90" TextWrapping="NoWrap" FontFamily="monospace" />
+        <TextBlock Classes="hint error" Text="{Binding EnvironmentError}" />
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

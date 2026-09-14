@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>ACLauncher.Core</RootNamespace>
+    <AssemblyName>ACLauncher.Core</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ACLauncher.Tests" />
+  </ItemGroup>
+
+</Project>

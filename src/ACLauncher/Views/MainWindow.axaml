@@ -1,0 +1,115 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ACLauncher.ViewModels"
+        x:Class="ACLauncher.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Classes="launcher"
+        Title="AC Launcher"
+        Width="940" Height="640" MinWidth="720" MinHeight="440">
+
+  <Window.KeyBindings>
+    <KeyBinding Gesture="F5" Command="{Binding LaunchCommand}" />
+  </Window.KeyBindings>
+
+  <DockPanel Margin="12">
+
+    <!-- Top: title, filter, status, launch -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,10">
+      <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+        <Image Source="/Assets/icon.png" Width="52" Height="52" />
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Classes="title" Text="AC Launcher" />
+          <CheckBox Content="Show ticked accounts only" IsChecked="{Binding ShowEnabledOnly}" />
+        </StackPanel>
+      </StackPanel>
+      <TextBlock Grid.Column="1" Text="{Binding StatusText}" TextWrapping="Wrap"
+                 VerticalAlignment="Center" HorizontalAlignment="Right" TextAlignment="Right" Margin="16,0" />
+      <Button Grid.Column="2" Content="Stop all" Command="{Binding StopAllCommand}"
+              IsVisible="{Binding HasRunning}" Margin="0,0,8,0" VerticalAlignment="Center" />
+      <Panel Grid.Column="3" VerticalAlignment="Center">
+        <Button Classes="accent" Content="Launch  (F5)" Command="{Binding LaunchCommand}"
+                IsVisible="{Binding !IsLaunching}" MinWidth="120" HorizontalContentAlignment="Center" FontWeight="Bold" />
+        <Button Content="Cancel" Command="{Binding CancelLaunchCommand}"
+                IsVisible="{Binding IsLaunching}" MinWidth="120" HorizontalContentAlignment="Center" />
+      </Panel>
+    </Grid>
+
+    <!-- Bottom: account buttons and the game folder -->
+    <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="0,10,0,0">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <Button Content="Add account" Click="OnAddAccount" />
+          <Button Content="Edit account" Click="OnEditAccount" IsEnabled="{Binding HasSelectedAccount}" />
+          <Button Content="Delete account" Click="OnDeleteAccount" IsEnabled="{Binding HasSelectedAccount}" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+          <Button Content="Servers" Click="OnServers" />
+          <Button Content="Settings" Click="OnSettings" />
+          <Button Content="Log" Click="OnLog" />
+        </StackPanel>
+      </Grid>
+      <TextBlock Classes="label" Text="Asheron's Call folder" Margin="0,6,0,0" />
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBox Text="{Binding GameDirectory}" />
+        <Button Grid.Column="1" Content="Browse…" Click="OnBrowseGameFolder" Margin="6,0,0,0" />
+      </Grid>
+      <TextBlock Classes="hint" Classes.error="{Binding !GameFolderValid}" Text="{Binding GameFolderMessage}" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <!-- Accounts and the servers under each -->
+    <Border Classes="panel">
+      <Panel>
+        <TextBlock Text="No accounts yet — use Add account to create one."
+                   IsVisible="{Binding !HasAccounts}" HorizontalAlignment="Center" VerticalAlignment="Center" Classes="dim" />
+        <ListBox ItemsSource="{Binding VisibleAccounts}" SelectedItem="{Binding SelectedAccount}" Background="Transparent">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:AccountItemViewModel">
+              <Grid ColumnDefinitions="Auto,*">
+                <CheckBox IsChecked="{Binding Enabled}" VerticalAlignment="Top" Margin="0,6,4,0"
+                          ToolTip.Tip="Launch this account" />
+                <Expander Grid.Column="1" IsExpanded="{Binding IsExpanded}" HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Stretch">
+                  <Expander.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                      <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" Foreground="#FFFFB619" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding Summary}" Classes="dim" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                  </Expander.Header>
+                  <StackPanel Spacing="2">
+                    <CheckBox Content="Show all servers" IsChecked="{Binding ShowAllServers}" />
+                    <TextBlock Text="No servers to show. Tick Show all servers, or add one under Servers."
+                               IsVisible="{Binding HasNoServers}" Classes="dim" />
+                    <ItemsControl ItemsSource="{Binding ShownServers}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:AccountServerItemViewModel">
+                          <Grid ColumnDefinitions="Auto,Auto,52,*,Auto,Auto" Margin="0,2">
+                            <CheckBox IsChecked="{Binding Selected}" VerticalAlignment="Center" ToolTip.Tip="Launch on this server" />
+                            <TextBlock Grid.Column="1" Classes="dot" Text="●" Foreground="{Binding StatusBrush}"
+                                       ToolTip.Tip="{Binding StatusTip}" />
+                            <TextBlock Grid.Column="2" Text="{Binding Emulator}" Classes="dim" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="3" VerticalAlignment="Center">
+                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                              <TextBlock Text="{Binding Detail}" Classes="dim" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="4" Orientation="Horizontal">
+                              <Button Classes="link" Content="Discord" Command="{Binding OpenDiscordCommand}" IsVisible="{Binding HasDiscord}" />
+                              <Button Classes="link" Content="Website" Command="{Binding OpenWebsiteCommand}" IsVisible="{Binding HasWebsite}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsRunning}" Margin="8,0,0,0">
+                              <TextBlock Classes="running" Text="Running" />
+                              <Button Content="Stop" Command="{Binding StopCommand}" />
+                            </StackPanel>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </Expander>
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Panel>
+    </Border>
+  </DockPanel>
+</Window>

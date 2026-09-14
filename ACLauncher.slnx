@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ACLauncher.Core/ACLauncher.Core.csproj" />
+    <Project Path="src/ACLauncher/ACLauncher.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ACLauncher.Tests/ACLauncher.Tests.csproj" />
+  </Folder>
+</Solution>

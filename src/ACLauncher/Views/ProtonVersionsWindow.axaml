@@ -1,0 +1,72 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ACLauncher.ViewModels"
+        xmlns:proton="using:ACLauncher.Core.Proton"
+        x:Class="ACLauncher.Views.ProtonVersionsWindow"
+        x:DataType="vm:ProtonVersionsViewModel"
+        Classes="launcher"
+        Title="Proton versions"
+        Width="860" Height="680" MinWidth="600" MinHeight="420"
+        WindowStartupLocation="CenterOwner">
+
+  <Window.DataTemplates>
+    <DataTemplate x:DataType="vm:ProtonVersionRow">
+      <Grid ColumnDefinitions="*,Auto" Margin="2,4">
+        <StackPanel VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="#FFFFB619" />
+            <Border Classes="badge" IsVisible="{Binding IsLatest}"><TextBlock Text="latest" /></Border>
+            <Border Classes="badge" IsVisible="{Binding Prerelease}"><TextBlock Text="pre-release" /></Border>
+            <Border Classes="badge inuse" IsVisible="{Binding IsInUse}"><TextBlock Text="in use" /></Border>
+          </StackPanel>
+          <TextBlock Text="{Binding Detail}" Classes="dim" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="10,0,0,0">
+          <Button Content="Install" Command="{Binding InstallCommand}" IsVisible="{Binding !IsInstalled}" MinWidth="76" HorizontalContentAlignment="Center" />
+          <Button Classes="accent" Content="Use" Command="{Binding UseCommand}" IsVisible="{Binding IsInstalled}" MinWidth="76" HorizontalContentAlignment="Center" />
+          <Button Content="Remove" Command="{Binding RemoveCommand}" IsVisible="{Binding CanRemove}" />
+        </StackPanel>
+      </Grid>
+    </DataTemplate>
+  </Window.DataTemplates>
+
+  <DockPanel Margin="14">
+    <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,10">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+        <ComboBox ItemsSource="{Binding Families}" SelectedItem="{Binding SelectedFamily}" MinWidth="170" VerticalAlignment="Center">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="proton:ProtonFamilyInfo">
+              <TextBlock Text="{Binding Name}" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <TextBlock Grid.Column="1" Text="{Binding SelectedFamily.Description}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="12,0" />
+        <CheckBox Grid.Column="2" Content="Show pre-releases" IsChecked="{Binding ShowPrereleases}" VerticalAlignment="Center" Margin="0,0,8,0" />
+        <Button Grid.Column="3" Content="Refresh" Command="{Binding RefreshCommand}" VerticalAlignment="Center" />
+      </Grid>
+      <Button Content="{Binding UseLatestLabel}" Command="{Binding UseLatestCommand}"
+              ToolTip.Tip="The newest release is downloaded before a launch whenever a new one comes out" />
+    </StackPanel>
+
+    <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,10,0,0">
+      <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsDownloading}">
+        <ProgressBar Minimum="0" Maximum="1" Value="{Binding ProgressValue}" IsIndeterminate="{Binding ProgressIndeterminate}" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Content="Cancel" Command="{Binding CancelDownloadCommand}" Margin="8,0,0,0" />
+      </Grid>
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Content="Close" Click="OnClose" MinWidth="80" HorizontalContentAlignment="Center" />
+      </Grid>
+    </StackPanel>
+
+    <Grid RowDefinitions="2*,Auto,*">
+      <Border Classes="panel">
+        <ListBox ItemsSource="{Binding Versions}" Background="Transparent" />
+      </Border>
+      <TextBlock Grid.Row="1" Classes="label" Text="Already on this computer" IsVisible="{Binding HasElsewhere}" Margin="0,10,0,4" />
+      <Border Grid.Row="2" Classes="panel" IsVisible="{Binding HasElsewhere}">
+        <ListBox ItemsSource="{Binding Elsewhere}" Background="Transparent" />
+      </Border>
+    </Grid>
+  </DockPanel>
+</Window>

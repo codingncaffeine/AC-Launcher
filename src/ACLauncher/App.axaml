@@ -1,0 +1,77 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="ACLauncher.App"
+             RequestedThemeVariant="Dark">
+  <Application.Styles>
+    <FluentTheme>
+      <FluentTheme.Palettes>
+        <ColorPaletteResources x:Key="Dark"
+                               Accent="#FFD9A441"
+                               AltHigh="#FF16120C"
+                               RegionColor="#FF1B150E"
+                               ChromeMediumLow="#FF221A10" />
+      </FluentTheme.Palettes>
+    </FluentTheme>
+
+    <Style Selector="Window.launcher">
+      <Setter Property="Background" Value="#FF16120C" />
+      <Setter Property="Foreground" Value="#FFE8C27A" />
+      <Setter Property="Icon" Value="/Assets/icon.png" />
+    </Style>
+    <Style Selector="Border.badge">
+      <Setter Property="Background" Value="#33FFB619" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Padding" Value="6,0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.badge > TextBlock">
+      <Setter Property="FontSize" Value="11" />
+    </Style>
+    <Style Selector="Border.badge.inuse">
+      <Setter Property="Background" Value="#559CCC65" />
+    </Style>
+    <Style Selector="TextBlock.title">
+      <Setter Property="FontSize" Value="22" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="#FFFFB619" />
+    </Style>
+    <Style Selector="TextBlock.label">
+      <Setter Property="Foreground" Value="#FFFFB619" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.dim">
+      <Setter Property="Foreground" Value="#FFA88A55" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+    <Style Selector="TextBlock.hint">
+      <Setter Property="Foreground" Value="#FF9CCC65" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+    <Style Selector="TextBlock.hint.error">
+      <Setter Property="Foreground" Value="#FFE57373" />
+    </Style>
+    <Style Selector="TextBlock.running">
+      <Setter Property="Foreground" Value="#FF9CCC65" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.dot">
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="4,0,8,0" />
+    </Style>
+    <Style Selector="Border.panel">
+      <Setter Property="Background" Value="#A5000000" />
+      <Setter Property="BorderBrush" Value="#FF5C4520" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="4" />
+    </Style>
+    <Style Selector="Button.link">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="#FFD9A441" />
+      <Setter Property="Padding" Value="6,2" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+  </Application.Styles>
+</Application>

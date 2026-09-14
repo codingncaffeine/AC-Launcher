@@ -1,0 +1,93 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ACLauncher.ViewModels"
+        x:Class="ACLauncher.Views.ServersWindow"
+        x:DataType="vm:ServersViewModel"
+        Classes="launcher"
+        Title="Servers"
+        Width="960" Height="620" MinWidth="700" MinHeight="400"
+        WindowStartupLocation="CenterOwner">
+  <DockPanel Margin="12">
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,10">
+      <TextBlock Classes="label" Text="Search" VerticalAlignment="Center" Margin="0,0,8,0" />
+      <TextBox Grid.Column="1" Text="{Binding Filter}" />
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="10,0,0,0">
+        <Button Content="Add server" Command="{Binding AddCommand}" />
+        <Button Content="Copy" Command="{Binding CopyCommand}" ToolTip.Tip="Make an editable copy of the selected server" />
+        <Button Content="Delete" Command="{Binding DeleteCommand}" />
+        <Button Content="Refresh lists" Command="{Binding RefreshCommand}" />
+      </StackPanel>
+    </Grid>
+
+    <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="0,10,0,0">
+      <TextBlock Text="{Binding StatusText}" Classes="dim" VerticalAlignment="Center" />
+      <Button Grid.Column="1" Classes="accent" Content="Close" Click="OnClose" MinWidth="80" HorizontalContentAlignment="Center" />
+    </Grid>
+
+    <Grid ColumnDefinitions="340,*">
+      <Border Classes="panel">
+        <ListBox ItemsSource="{Binding Servers}" SelectedItem="{Binding Selected}" Background="Transparent">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:ServerRowViewModel">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel>
+                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Address}" Classes="dim" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <CheckBox Grid.Column="1" Content="Hide" IsChecked="{Binding Hidden}" Margin="8,0,0,0"
+                          ToolTip.Tip="Hide this server from the account lists" />
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Border>
+
+      <Panel Grid.Column="1" Margin="14,0,0,0">
+        <TextBlock Text="Select a server to see its details." Classes="dim" IsVisible="{Binding !HasSelection}" />
+        <ScrollViewer>
+          <ContentControl Content="{Binding Selected}">
+            <ContentControl.ContentTemplate>
+              <DataTemplate x:DataType="vm:ServerRowViewModel">
+                <StackPanel Spacing="6">
+                  <TextBlock Text="{Binding SourceLabel}" Classes="dim" TextWrapping="Wrap" />
+
+                  <TextBlock Classes="label" Text="Name" />
+                  <TextBox Text="{Binding Name}" IsReadOnly="{Binding IsReadOnly}" />
+
+                  <TextBlock Classes="label" Text="Address (host:port)" />
+                  <TextBox Text="{Binding Address}" IsReadOnly="{Binding IsReadOnly}" />
+                  <TextBlock Text="{Binding AddressError}" Classes="hint error" />
+
+                  <TextBlock Classes="label" Text="Server type" />
+                  <StackPanel Orientation="Horizontal" Spacing="16">
+                    <ComboBox ItemsSource="{x:Static vm:ServerRowViewModel.EmulatorOptions}" SelectedItem="{Binding Emulator}"
+                              IsEnabled="{Binding IsUser}" MinWidth="120" />
+                    <CheckBox Content="rodat on" IsChecked="{Binding Rodat}" IsEnabled="{Binding IsUser}"
+                              ToolTip.Tip="Passes -rodat on to the client" />
+                  </StackPanel>
+
+                  <TextBlock Classes="label" Text="Description" />
+                  <TextBox Text="{Binding Description}" IsReadOnly="{Binding IsReadOnly}" TextWrapping="Wrap" AcceptsReturn="False" />
+
+                  <TextBlock Classes="label" Text="Discord link" />
+                  <TextBox Text="{Binding DiscordUrl}" IsReadOnly="{Binding IsReadOnly}" />
+
+                  <TextBlock Classes="label" Text="Website" />
+                  <TextBox Text="{Binding WebsiteUrl}" IsReadOnly="{Binding IsReadOnly}" />
+
+                  <TextBlock Classes="label" Text="Asheron's Call folder for this server (optional)" />
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBox Text="{Binding GameDirectory}" IsReadOnly="{Binding IsReadOnly}" />
+                    <Button Grid.Column="1" Content="Browse…" Click="OnBrowseGameFolder" IsEnabled="{Binding IsUser}" Margin="6,0,0,0" />
+                  </Grid>
+                  <TextBlock Classes="dim" TextWrapping="Wrap"
+                             Text="Leave empty to use the folder set on the main window." />
+                </StackPanel>
+              </DataTemplate>
+            </ContentControl.ContentTemplate>
+          </ContentControl>
+        </ScrollViewer>
+      </Panel>
+    </Grid>
+  </DockPanel>
+</Window>

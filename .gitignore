@@ -1,0 +1,18 @@
+# Build output
+bin/
+obj/
+dist/
+*.user
+.vs/
+.vscode/
+.idea/
+
+# Local planning docs — never pushed
+/local-notes/
+
+# Game client files and installers — user-supplied, never committed
+*.dat
+*.exe
+*.msi
+*.dll
+*.pdb
